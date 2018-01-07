@@ -12,8 +12,11 @@
     <buildtool_depend>catkin</buildtool_depend>
 
     <run_depend>youbot_description</run_depend>
-    <run_depend>youbot_gazebo_publisher</run_depend>
+    <run_depend>youbot_trajectory_commader</run_depend>
     <run_depend>youbot_simulation</run_depend>
+    <run_depend>youbot_moveit</run_depend>
+    <run_depend>youbot_arm_kinematics</run_depend>
+    <run_depend>youbot_arm_kinematics_moveit</run_depend>
 
   <export>
     <metapackage/>

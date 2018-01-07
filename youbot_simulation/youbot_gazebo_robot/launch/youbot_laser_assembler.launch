@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<launch>
+  <node type="laser_scan_assembler" pkg="laser_assembler"
+        name="hokuyo_assembler">
+    <remap from="/base_scan" to="/tilt_scan"/>
+    <param name="max_scans" type="int" value="400" />
+    <param name="base_link" type="string" value="base_link" />
+  </node>
+</launch>
