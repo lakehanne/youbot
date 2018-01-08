@@ -1,4 +1,5 @@
-//Sample program for simulation of KUKA youBot in Gazebo using ROS
+// Olalekan Ogunmolu
+// 
 
 #include "ros/ros.h"
 #include "boost/units/systems/si.hpp"

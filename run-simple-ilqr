@@ -1,0 +1,3 @@
+#!/bin/bash
+# rosrun gazebo_trajectory_commander simple_ilqr
+rosrun gazebo_trajectory_commander nav_target

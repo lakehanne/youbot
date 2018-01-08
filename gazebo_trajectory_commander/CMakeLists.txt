@@ -6,6 +6,8 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   trajectory_msgs
   roscpp
+  actionlib
+  move_base_msgs
 )
 
 catkin_package()
@@ -14,24 +16,15 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-add_executable(gazebo_trajectory_commander src/gazebo_trajectory_commander.cpp)
-add_executable(simple_ilqr src/simple_ilqr.cpp)
-
-target_link_libraries(gazebo_trajectory_commander
-  ${catkin_LIBRARIES}
-)
-target_link_libraries(simple_ilqr
-  ${catkin_LIBRARIES}
-)
-
-install(TARGETS gazebo_trajectory_commander gazebo_trajectory_commander
+macro(add_exec name)
+  add_executable(${name} src/${name}.cpp)
+  target_link_libraries(${name} ${catkin_LIBRARIES})
+  install(TARGETS ${name} ${name}
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
+endmacro()
 
-install(TARGETS simple_ilqr simple_ilqr
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
+add_exec(simple_ilqr)
+add_exec(nav_target)
