@@ -30,4 +30,9 @@
     <param name="publish_frequency" type="double" value="100.0" />
   </node>
 
+  <!-- launch generated map -->
+  <node pkg="map_server" type="map_server" name="slalom_walls_server" output="screen" 
+    args="$(find youbot_navigation)/maps/slalom_map2.yaml" respawn="false">
+  </node>
+
 </launch>

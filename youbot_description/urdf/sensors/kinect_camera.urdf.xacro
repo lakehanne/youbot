@@ -3,7 +3,7 @@
       xmlns:controller="http://playerstage.sourceforge.net/gazebo/xmlschema/#controller"
       xmlns:interface="http://playerstage.sourceforge.net/gazebo/xmlschema/#interface"
       xmlns:xacro="http://ros.org/wiki/xacro">
-  
+
 
   <xacro:include filename="$(find youbot_description)/urdf/sensors/kinect_camera.gazebo.xacro"/>
 
@@ -13,7 +13,7 @@
     <parent link="${parent}" />
     <child link="${name}_camera" />
    </joint>
-  
+
    <link name="${name}_camera">
     <inertial>
       <mass value="0.01" />
@@ -28,6 +28,7 @@
       <geometry>
        <mesh filename="package://youbot_description/meshes/sensors/kinect.dae"/>
       </geometry>
+      <material name="orange" />
     </visual>
 
     <collision>
@@ -102,11 +103,11 @@
         izz="0.0001" />
     </inertial>
   </link>
-  
-  <!-- for simulation -->
-  <xacro:kinect_camera_gazebo name="openni" />
 
- 
-</xacro:macro> 
+  <!-- for simulation -->
+  <xacro:kinect_camera_gazebo name="kinect"/>
+
+
+</xacro:macro>
 
 </root>

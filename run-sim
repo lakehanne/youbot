@@ -1,0 +1,3 @@
+#! /bin/bash
+
+roslaunch youbot_gazebo_robot youbot.launch

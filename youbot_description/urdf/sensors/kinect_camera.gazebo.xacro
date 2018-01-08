@@ -42,7 +42,7 @@
       <baseline>0.2</baseline>
       <controller:gazebo_ros_camera name="${name}_rgb_frame_controller" plugin="libgazebo_ros_camera.so">
         <alwaysOn>true</alwaysOn>
-        <updateRate>20.0</updateRate>
+        <updateRate>30.0</updateRate>
         <imageTopicName>/camera/rgb/image_raw</imageTopicName>
         <cameraInfoTopicName>/camera/rgb/camera_info</cameraInfoTopicName>
         <frameName>/${name}_rgb_optical_frame</frameName>

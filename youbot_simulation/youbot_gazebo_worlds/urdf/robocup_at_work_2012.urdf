@@ -97,6 +97,8 @@
     </collision>
   </link>
 
+<!-- Removing middle walls
+
   <joint name="join3" type="fixed">
     <origin xyz="0 -0.4 0" rpy="0 0 0"/>
     <parent link="wall_3"/>
@@ -121,7 +123,7 @@
       <box size="0.1 0.8 0.3" />
       </geometry>
     </collision>
-  </link>
+  </link> 
 
   <joint name="join4" type="fixed">
     <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -148,7 +150,7 @@
       </geometry>
     </collision>
   </link>
-
+ -->
 ----------
   <joint name="join5" type="fixed">
     <origin xyz="-2 -0.4 0" rpy="0 0 0"/>
@@ -255,6 +257,36 @@
   </link>
 
 
+  <!-- youbot obstacle -->
+  <joint name="join_box" type="fixed">
+    <origin xyz="${5*0.6} -0.15 0.0" rpy="0 0 0"/>
+    <parent link="wall_8"/>
+    <child link="orange_box"/>
+  </joint>
+
+  <link name="orange_box">
+    <inertial>
+       <mass value="1e-2"/>
+       <inertia ixx="${1e-2/12}" ixy="0.0" ixz="0.0" 
+        iyy="${1e-2/12}" iyz="0.0000" 
+        izz="${1e-2/12}"/>
+    </inertial>
+    <visual>
+     <origin xyz="0 0 0" rpy="0 0 0" />
+     <geometry>
+       <box size="${2*0.15748} ${2*0.15748} ${0.35*0.8508}" />
+     </geometry>
+     <material name="orange"/>
+     <origin xyz="0 0 0" rpy="0 0 0" />
+    </visual>    
+    <collision>
+       <origin xyz="0 0 0" rpy="0 0 0" />
+       <geometry>        
+        <box size="${2*0.15748} ${2*0.15748} ${0.35*0.8508}}"  />
+       </geometry>
+    </collision>
+  </link>
+
 
 
   <gazebo reference="wall_1">
@@ -269,14 +301,14 @@
   <material>Gazebo/Gray</material>
   <selfCollide>true</selfCollide>
   </gazebo>
-  <gazebo reference="wall_4">
-  <material>Gazebo/Gray</material>
+<!--   <gazebo reference="wall_4">
+  <material>Gazebo/Red</material>
   <selfCollide>true</selfCollide>
   </gazebo>
   <gazebo reference="wall_5">
-  <material>Gazebo/Gray</material>
+  <material>Gazebo/Red</material>
   <selfCollide>true</selfCollide>
-  </gazebo>
+  </gazebo> -->
   <gazebo reference="wall_6">
   <material>Gazebo/Gray</material>
   <selfCollide>true</selfCollide>
@@ -297,5 +329,9 @@
   <material>Gazebo/Gray</material>
   <selfCollide>true</selfCollide>
   </gazebo>
+  <gazebo reference="orange_box">
+  <material>Gazebo/Orange</material>
+  <selfCollide>true</selfCollide>
+  </gazebo>  
 
 </robot>

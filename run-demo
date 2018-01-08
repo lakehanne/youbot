@@ -1,0 +1,2 @@
+#!/bin/bash
+rosrun gazebo_trajectory_commander simple_ilqr
