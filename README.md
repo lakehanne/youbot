@@ -6,5 +6,8 @@
 * AMCL 
 	* `./run-navstack`
 
-* ILQR
-	* `./run-ilqr`
+* ActionLib Example
+	* `./run-goal-nav`
+
+* ILQR Hardcoded Trajectory Example
+	* `././run-simple-ilqr`
