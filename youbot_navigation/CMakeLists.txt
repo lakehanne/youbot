@@ -15,7 +15,10 @@ find_package(catkin REQUIRED COMPONENTS
   trajectory_msgs
   roscpp
   actionlib
+<<<<<<< HEAD
   nav_msgs
+=======
+>>>>>>> 079dcb22473abff3b1987741d111c4207d58aa69
   move_base_msgs
 )
 
