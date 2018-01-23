@@ -64,9 +64,9 @@
   </xacro:hokuyo_urg04_laser>
 
   <!-- kinect camera front -->
-  <xacro:kinect_camera name="kinect_camera" parent="arm_link_4">
+<!--   <xacro:kinect_camera name="kinect_camera" parent="arm_link_4">
     <origin xyz="0.2 0 0.33" rpy="0 0 0" />
-  </xacro:kinect_camera>
+  </xacro:kinect_camera> -->
 
 
 </robot>

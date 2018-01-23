@@ -27,4 +27,4 @@ macro(add_exec name)
 endmacro()
 
 add_exec(simple_ilqr)
-add_exec(nav_target)
+#add_exec(nav_target)
