@@ -10,7 +10,7 @@ import numpy as np
 
 from geometry_msgs.msg import Twist, \
 		Pose, PoseStamped, Quaternion
-from tf.transformations import euler_from_quaternion		
+from tf.transformations import euler_from_quaternion
 
 
 parser = argparse.ArgumentParser(description='odom_receiver')
@@ -31,12 +31,12 @@ class ILQR(object):
 		self.arg = arg
 		self.dU = 7 # dimension of robot pose
 
-		desired_pose = PoseStamped
+		desired_pose = PoseStampedtheta
 	    desired_pose.target_pose.header.frame_id = "base_link"
 	    desired_pose.target_pose.header.stamp = rospy.Time.now();
 	    desired_pose.target_pose.pose.position.x = 0.736239556594; #//0.00;
 	    desired_pose.target_pose.pose.position.y = 0.803042138661; #//0.000001;
-	    desired_pose.target_pose.pose.position.z = 0.0;  
+	    desired_pose.target_pose.pose.position.z = 0.0;
 	    desired_pose.target_pose.pose.orientation.x =  -3.18874459879e-06;
 	    desired_pose.target_pose.pose.orientation.y = -1.08345476892e-05;
 	    desired_pose.target_pose.pose.orientation.z = 0.0432270282388;
@@ -56,6 +56,7 @@ class ILQR(object):
 	   	self.penalty = 0.0001
 
 	def odom_cb(self, pose_stamped):
+
      	# convert current and desired to numpy arrays
      	self.current_pose = np.asarray([pose_stamped.target_pose.pose.position.x,
      							   		pose_stamped.target_pose.pose.position.y,
@@ -70,7 +71,7 @@ class ILQR(object):
 
 
 	def listener(self):
-	    rospy.init_node('Listener')      	
+	    rospy.init_node('Listener')
       	rospy.Subscriber('/odom', PoseStamped, self.odom_cb)
 
      def set_up_cost(self):
@@ -89,7 +90,7 @@ class ILQR(object):
      	self.final_cost = 0.5 * (diff).T.dot(diff)
 
 
-     def assemble_dynamics(self):     	
+     def assemble_dynamics(self):
 		mat_maker = MassMaker()
 		mat_maker.get_mass_matrices()
 
@@ -154,6 +155,8 @@ class ILQR(object):
 		B[3,1] = B[0,0]
 
 		S = np.diag([])
+
+		return M, C, B, S
 
 
 if __name__ == '__main__':
