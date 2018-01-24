@@ -23,11 +23,8 @@
   <build_depend>roscpp</build_depend>
   <build_depend>rospy</build_depend>
   <build_depend>tf</build_depend>
-<<<<<<< HEAD
   <build_depend>nav_msgs</build_depend>
 
-=======
->>>>>>> 079dcb22473abff3b1987741d111c4207d58aa69
   
   <run_depend>geometry_msgs</run_depend>
   <run_depend>trajectory_msgs</run_depend>
@@ -36,11 +33,7 @@
   <run_depend>roscpp</run_depend>
   <run_depend>rospy</run_depend>
   <run_depend>tf</run_depend>
-<<<<<<< HEAD
   <run_depend>nav_msgs</run_depend>
-=======
->>>>>>> 079dcb22473abff3b1987741d111c4207d58aa69
-
   <!-- The export tag contains other, unspecified, tags -->
   <export>
     <!-- Other tools can request additional information be placed here -->

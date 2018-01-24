@@ -4,9 +4,13 @@
 
 import argparse
 import rospy
+import MassMaker
+import threading
 import numpy as np
 
-from geometry_msgs.msg import Twist, Pose, PoseStamped
+from geometry_msgs.msg import Twist, \
+		Pose, PoseStamped, Quaternion
+from tf.transformations import euler_from_quaternion		
 
 
 parser = argparse.ArgumentParser(description='odom_receiver')
@@ -22,14 +26,13 @@ class ILQR(object):
 
 	"""
 
-	def __init__(self, arg, Twist, Pose, PoseStamped):
+	def __init__(self, arg):
 		super(ILQR, self).__init__()
 		self.arg = arg
 		self.dU = 7 # dimension of robot pose
 
-		desired_pose = PoseStamped
-
-	    desired_pose.target_pose.header.frame_id = "base_link";
+		desired_pose = PoseStampedtheta
+	    desired_pose.target_pose.header.frame_id = "base_link"
 	    desired_pose.target_pose.header.stamp = rospy.Time.now();
 	    desired_pose.target_pose.pose.position.x = 0.736239556594; #//0.00;
 	    desired_pose.target_pose.pose.position.y = 0.803042138661; #//0.000001;
@@ -53,15 +56,15 @@ class ILQR(object):
 	   	self.penalty = 0.0001
 
 	def odom_cb(self, pose_stamped):
-		current_pose = pose_stamped
+		self.youbot_orientation = pose_stamped.target_pose.pose.orientation
      	# convert current and desired to numpy arrays
-     	self.current_pose = np.asarray([current_pose.target_pose.pose.position.x,
-     							   		current_pose.target_pose.pose.position.y,
-     							   		current_pose.target_pose.pose.position.z,
-     							   		current_pose.target_pose.pose.orientation.x,
-     							   		current_pose.target_pose.pose.orientation.y,
-     							   		current_pose.target_pose.pose.orientation.z,
-     							   		current_pose.target_pose.pose.orientation.w])
+     	self.current_pose = np.asarray([pose_stamped.target_pose.pose.position.x,
+     							   		pose_stamped.target_pose.pose.position.y,
+     							   		pose_stamped.target_pose.pose.position.z,
+     							   		pose_stamped.target_pose.pose.orientation.x,
+     							   		pose_stamped.target_pose.pose.orientation.y,
+     							   		pose_stamped.target_pose.pose.orientation.z,
+     							   		pose_stamped.target_pose.pose.orientation.w])
      	self.current_pose = np.expand_dims(self.current_pose, axis=1)
 
 
@@ -84,7 +87,62 @@ class ILQR(object):
 
      	self.final_cost = 0.5 * (diff).T.dot(diff)
 
-ilqr = ILQR(args, Twist, Pose, PoseStamped)
 
-while not rospy.is_shutdown():
-	listener()
+     def assemble_dynamics(self):     	
+		mat_maker = MassMaker()
+		mat_maker.get_mass_matrices()
+
+		mb = mat_maker.base['mass']
+		mw = mat_maker.wheel['mass']
+		r = mat_maker.wheel['radius']
+		"""
+		I_b is the moment of inertia of the platform about Zr' axis thru G'
+		I is the mom of inertia of ith wheel about main axis
+		"""
+		I_b = mat_maker.base['mass_inertia'][-1,-1]
+		I = mat_maker.wheel['mass_inertia'][-1,-1]
+
+		# f_i are the frictional force of each of the four wheels
+		f = np.array([
+		              mat_maker.wheel['friction'], mat_maker.wheel['friction'],
+		              mat_maker.wheel['friction'], mat_maker.wheel['friction']
+		             ])
+		f = np.expand_dims(f, axis=1)
+		base_footprint_dim = 0.001  # retrieved from the box geom in gazebo
+		l = np.sqrt(2* base_footprint_dim)
+		l_sqr = 2* base_footprint_dim
+		b, a = 0.19, 0.145 # meters as measured from the real robot
+
+		"""
+		theta is something that we obtain from the wheel's odometry information
+		theta is the rotation about the Z_R axis
+		"""
+		_, _, theta = euler_from_quaternion(self.youbot_orientation)
+		d1, d2 = 1e-2, 1e-2 # not sure of this
+		alpha = np.arctan2(b, a)
+		# define matrix elements
+		m11 = mb + 4 * (mw + I/(r*r))
+		m22 = mb + 4 * (mw + I/(r*r))
+		m13 = mb * ( d1 * np.sin(theta) + d2 * np.sin(theta) )
+		m23 = mb * (-d1 * np.cos(theta) + d2 * np.sin(theta) )
+		m33 = mb * (pow(d1, 2) + pow(d2, 2)) + I_b + \
+					8 * (mw + I/pow(r,2)) * l_sqr * pow(np.sin(pi/4.0 - alpha), 2)
+
+		# assemble mass inertia matrix
+		M = np.zeros((3,3))
+		M[0,0], M[1,1], M[2,2] = m11, m22, m33
+		M[0,2], M[2,0], M[1,2], M[2,1] = m13, m13, m23, m23
+
+
+
+if __name__ == '__main__':
+	ilqr = ILQR(args)
+
+	while not rospy.is_shutdown():
+		ilqr.listener()
+
+	    generate_matrices = threading.Thread(
+	    target=lambda: ilqr.assemble_dynamics()
+	    )
+	    generate_matrices.daemon = True
+	    generate_matrices.start()
