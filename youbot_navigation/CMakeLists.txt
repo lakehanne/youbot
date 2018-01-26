@@ -19,7 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
   move_base_msgs
 )
 
-
+# catkin_python_setup()
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
