@@ -157,7 +157,6 @@ class ILQR(MassMaker):
         qdot    = np.expand_dims(np.array([xdot, ydot, theta_dot]), axis=1)
         qdotdot = np.expand_dims(np.array([xaccel, yaccel, theta_accel]), axis=1)
 
-
         # C matrix components
         c13 = mb * theta_dot * (d1 * np.cos(theta) - d2 * np.sin(theta))
         c23 = mb * theta_dot * (d1 * np.sin(theta) + d2 * np.cos(theta))
@@ -217,12 +216,20 @@ class ILQR(MassMaker):
         fu         = np.zeros((T, dU, 1))
 
         stagecost_penalty    = self.hyperparams['cost_params']['penalty']  # this is the r term in the objective function
+        
         # assemble stage_costs
         stage_costs     = np.zeros((T, 1))  # stage_costs
-        stage_actions   = np.zeros((T, dU, 1))
-        
+        stage_actions   = np.zeros((T, dU, 1))        
+        wheel_radius    = self.wheel['radius']
+
+        # Allocate.
+        Vxx = np.zeros((T, dX, dX))
+        Vx = np.zeros((T, dX))
+        Qtt = np.zeros((T, dX+dU, dX+dU))
+        Qt = np.zeros((T, dX+dU))
+
         for t in range (T-1, -1, -1):
-            # get body dynamics. Note that this are time changing parameters
+            # get body dynamics. Note that some of these are time varying parameters
             body_dynamics = self.assemble_dynamics() 
 
             # time varying inverse dynamics parameters
@@ -234,8 +241,7 @@ class ILQR(MassMaker):
             qvel            = body_dynamics.qvel    
             q               = body_dynamics.q      
 
-            # constant inverse dynamics parameters
-            wheel_radius    = body_dynamics.r
+            # this should be time-varying but is constant for now
             friction_vector = body_dynamics.f 
 
             # calculate inverse dynamics equation
@@ -248,15 +254,14 @@ class ILQR(MassMaker):
 
             # set up costs at time T
             u[t,:,:]        = torque_vector
-            u_bar[t,:,:]       = 0 # assume u_bar is zero
+            u_bar[t,:,:]    = 0 # assume u_bar is zero
             state[T,:]       = np.array([[q, qvel]]).T
             state_star[T,:]  = copy.copy(self.hyperparams['goal_state'])
             fx[T,:]          = -np.linalg.inv(mass_matrix).dot(coriolis_matrix)
             fu[T,:]          = -(1/wheel_radius) * np.linalg.inv(mass_matrix).dot(B_matrix.T) 
 
-            # retrieve this from the ib=nverse dynamics equation (20) in Todorov ILQG paper
+            # retrieve this from the inverse dynamics equation (20) in Todorov ILQG paper
             # stage_costs[t, :] = self.penalty * action.T.dot(action)
-            pass
         
 
         self.final_cost = 0.5 * (diff).T.dot(diff)
