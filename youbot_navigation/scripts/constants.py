@@ -233,14 +233,6 @@ class MassMaker(object):
 
         for key in self.various_links.keys():
             self.various_links[key]['mass_inertia'] = self.make_link_matrix(self.various_links[key])
-#           self.various_links[key]['friction'] = self.various_links[key]['friction'] \
-#                     if 'friction' in self.various_links.keys() else None
         self.__dict__.update(self.various_links)
         del self.various_links
-
-    def get_body_jacobian_matrices(self):
-        """
-        For each link with matrix m_i, we find the 
-        body jacobian matrix j_i
-        """
 

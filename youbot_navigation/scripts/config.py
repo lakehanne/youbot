@@ -10,12 +10,37 @@ config = dict(
 	cost_params = {
 		'T': 100,
 		'dU': 4,
-		'dX': 3+3, # includes velocity terms
-		'penalty': 0.0001
+		'dX': 3, # includes velocity terms; shape of state
+		'penalty': 0.0001,
+		'final_cost_weight': 1e-2,
+		'stage_cost_weight': 1e-2,
 	},
 
-	goal_state = np.asarray([[-1.42604078657e-07, 7.64165118802e-08, des_theta, 
-		                                    0, 0, 0]]).T,
+	agent = {		
+		# 'goal_state': np.asarray([[-1.42604078657e-07, 7.64165118802e-08, des_theta, 
+		# 	                                    0, 0, 0]]).T,
+		'goal_state': np.asarray([[-1.42604078657e-07, 7.64165118802e-08, des_theta]]).T,		
+		'T': 100,
+		'dU': 4,
+		'dV': 4,		
+		'dX': 3, # includes velocity terms
+		'dO': 3,	
+	},
+
+	linearized_params = {
+		    'x0': [np.array([0.5*np.pi, 0, 0, 0, 0, 0]),
+	           np.array([0.75*np.pi, 0.5*np.pi, 0, 0, 0, 0]),
+	           np.array([np.pi, -0.5*np.pi, 0, 0, 0, 0]),
+	           np.array([1.25*np.pi, 0, 0, 0, 0, 0]),
+	          ],
+
+	        'u0': [
+	        	   np.array([0, 0, 0, 0, 0, 0]),
+		           np.array([0, 0, 0, 0, 0, 0]),
+		           np.array([0, 0, 0, 0, 0, 0]),
+		           np.array([0, 0, 0, 0, 0, 0]),
+	          ],
+		}
 )
 
     # position: 

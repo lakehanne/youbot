@@ -1,62 +1,30 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
-import os
-import imp
-import time
-import copy
-import argparse
 import rospy
-import scipy as sp
 import logging
-import threading
 import numpy as np
+import multiprocessing
+from nav_msgs.msg import Odometry
 from collections import namedtuple
 
-import multiprocessing
+from scripts.constants import MassMaker
 from multiprocessing.pool import ThreadPool
-
-from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Twist, \
         Pose, PoseStamped, Quaternion
 from tf.transformations import euler_from_quaternion
 
-import roslib
-roslib.load_manifest('youbot_navigation')
+LOGGER = logging.getLogger(__name__)
 
-# import sys
-# print(sys.path)
-from scripts.torque import MassMaker
-
-parser = argparse.ArgumentParser(description='odom_receiver')
-parser.add_argument('--maxIter', '-mi', type=int, default='50',
-                        help='max num iterations' )
-parser.add_argument('--silent', '-si', action='store_true', default='False',
-                        help='max num iterations' )
-args = parser.parse_args()
-
-print(args)
-LOGGER = multiprocessing.log_to_stderr()
-if args.silent:
-    LOGGER.setLevel(logging.INFO)
-else:
-    LOGGER.setLevel(logging.DEBUG)
-
-class ILQR(MassMaker):
-    def __init__(self, arg, Odometry, hyperparams, rate=10):
-        super(ILQR, self).__init__()
+class Dynamics(MassMaker):
+    def __init__(self, Odometry, rate=10):
+        super(Dynamics, self).__init__()
         """
         self.desired_pose = final pose that we would like the robot to reach
         self.current_pose = current pose of the robot as obtained from odometric info
         self.penalty = penalty incurred on control law
         """
-        self.arg = arg
         self.rate = rate  # 10Hz
-
-        self.hyperparams = hyperparams
-        self.T = self.hyperparams['cost_params']['T']
-        self.dU = self.hyperparams['cost_params']['dU']
-        self.dX = self.hyperparams['cost_params']['dX']
 
         self.mat_maker = MassMaker()
         self.mat_maker.get_mass_matrices()
@@ -81,9 +49,9 @@ class ILQR(MassMaker):
         time_delta = now_time - prev_time
 
         # gather dynamics equation components
-        mb = self.base['mass']
-        mw = self.wheel['mass']
-        r = self.wheel['radius']
+        mb  = self.base['mass']
+        mw  = self.wheel['mass']
+        r   = self.wheel['radius']
         """
         I_b is the moment of inertia of the platform about Zr' axis thru G'
         I is the mom of inertia of ith wheel about main axis
@@ -198,100 +166,3 @@ class ILQR(MassMaker):
 
         return body_dynamics
 
-    def do_traj_opt(self):
-        T = self.hyperparams['cost_params']['T']
-        U = self.hyperparams['cost_params']['U']
-
-        # assemble Jacobian of transfer matrix and et cetera
-        u          = np.zeros((T, dU, 1))
-        u_bar      = np.zeros((T, dU, 1))
-        u_delta    = np.zeros((T, dU, 1))
-
-        state      = np.zeros((T, dX, 1))
-        state_bar  = np.zeros((T, dX, 1)) 
-        state_delta= np.zeros((T, dX, 1))  
-
-        state_star = np.zeros((T, dX, 1)) # desired state
-        fx         = np.zeros((T, dX, 1))
-        fu         = np.zeros((T, dU, 1))
-
-        stagecost_penalty    = self.hyperparams['cost_params']['penalty']  # this is the r term in the objective function
-        
-        # assemble stage_costs
-        stage_costs     = np.zeros((T, 1))  # stage_costs
-        stage_actions   = np.zeros((T, dU, 1))        
-        wheel_radius    = self.wheel['radius']
-
-        # Allocate.
-        Vxx = np.zeros((T, dX, dX))
-        Vx = np.zeros((T, dX))
-        Qtt = np.zeros((T, dX+dU, dX+dU))
-        Qt = np.zeros((T, dX+dU))
-
-        for t in range (T-1, -1, -1):
-            # get body dynamics. Note that some of these are time varying parameters
-            body_dynamics = self.assemble_dynamics() 
-
-            # time varying inverse dynamics parameters
-            mass_matrix     = body_dynamics.M       
-            coriolis_matrix = body_dynamics.C       
-            B_matrix        = body_dynamics.B       
-            S_matrix        = body_dynamics.S       
-            qaccel          = body_dynamics.qaccel  
-            qvel            = body_dynamics.qvel    
-            q               = body_dynamics.q      
-
-            # this should be time-varying but is constant for now
-            friction_vector = body_dynamics.f 
-
-            # calculate inverse dynamics equation
-            BBT             = B_matrix.dot(B_matrix.T)
-            Inv_BBT         = np.linalg.inv(BBT)
-            multiplier      = Inv_BBT.dot(wheel_radius * B_matrix)
-            inv_dyn_eq      = mass_matrix.dot(qaccel) + coriolis_matrix.dot(qvel) + \
-                                    B_matrix.T.dot(S_matrix).dot(friction_vector)
-            torque_vector   = multiplier.dot(inv_dyn_eq)
-
-            # set up costs at time T
-            u[t,:,:]        = torque_vector
-            u_bar[t,:,:]    = 0 # assume u_bar is zero
-            state[T,:]       = np.array([[q, qvel]]).T
-            state_star[T,:]  = copy.copy(self.hyperparams['goal_state'])
-            fx[T,:]          = -np.linalg.inv(mass_matrix).dot(coriolis_matrix)
-            fu[T,:]          = -(1/wheel_radius) * np.linalg.inv(mass_matrix).dot(B_matrix.T) 
-
-            # retrieve this from the inverse dynamics equation (20) in Todorov ILQG paper
-            # stage_costs[t, :] = self.penalty * action.T.dot(action)
-        
-
-        self.final_cost = 0.5 * (diff).T.dot(diff)
-
-
-if __name__ == '__main__':
-
-    from scripts import __file__ as scripts_filepath
-    scripts_filepath = os.path.abspath(scripts_filepath)
-    scripts_dir = '/'.join(str.split(scripts_filepath, '/')[:-1]) + '/'
-    hyperparams_file = scripts_dir + 'config.py'
-    hyperparams = imp.load_source('hyperparams', hyperparams_file)
-
-
-    try:
-        ilqr = ILQR(args, Odometry, hyperparams.config, rate=10)
-        rospy.init_node('Listener')
-        pool = ThreadPool(processes=2) # start 2 worker processes
-
-        while not rospy.is_shutdown():
-            """
-            generate_dynamics = threading.Thread(
-            target=lambda: ilqr.do_traj_opt()
-            )
-            generate_dynamics.daemon = True
-            generate_dynamics.start()
-            """
-
-            ilqr.do_traj_opt()
-
-
-    except KeyboardInterrupt:
-        LOGGER.critical("shutting down ros")
