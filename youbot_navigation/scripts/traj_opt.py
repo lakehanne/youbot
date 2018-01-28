@@ -67,6 +67,8 @@ class TrajectoryOptimization(Dynamics):
         rp = rospkg.RosPack()
         self.path = rp.get_path('youbot_navigation') 
 
+        self.fig = plt.figure()
+        self._ax = self.fig.gca()
         plt.ioff()
 
     def get_nominal_state(self, res, interval, mass_matrix, coriolis_matrix, \
@@ -151,34 +153,34 @@ class TrajectoryOptimization(Dynamics):
             fu[t,:,:]          = -(1/self.wheel_rad) * np.linalg.inv(mass_matrix).dot(B_matrix.T) 
 
             # euler integration  parameters
-            init_cond = [ action_bar[t,:,:], state_bar[t,:,:] ]
+            init_cond = [ action_bar[t,:,:].tolist(), state_bar[t,:,:].tolist() ]
             tt = np.linspace(0, 10, 101)
-            mass_inv = -np.linalg.inv(mass_matrix)
-            print(mass_inv.dot(coriolis_matrix).shape, state_bar[t,:,:].shape)
-            state_ddot = mass_inv.dot(coriolis_matrix).dot(state_bar[t,:,:]) - \
-                         mass_inv.dot(B_matrix.T).dot(S_matrix).dot(friction_vector) + \
-                        (mass_inv.dot(B_matrix.T).dot(action_bar[t,:,:]))/self.wheel_rad
-            # diff_eq = [x_init, state_ddot]
-            # print('state_ddot: ', state_ddot, friction_vector)
 
-            # state_bar = odeint(self.get_nominal_state, init_cond, tt, \
-            #             args=(mass_matrix, coriolis_matrix, B_matrix, \
-            #                 S_matrix, friction_vector, action_bar[t,:,:]))
+            # mass_inv = -np.linalg.inv(mass_matrix)
+            # state_ddot = mass_inv.dot(coriolis_matrix).dot(state_bar[t,:,:]) - \
+            #              mass_inv.dot(B_matrix.T).dot(S_matrix).dot(friction_vector) + \
+            #              mass_inv.dot(B_matrix.T).dot(action_bar[t,:,:])/self.wheel_rad
+
+            state_bar = odeint(self.get_nominal_state, init_cond, tt, \
+                        args=(mass_matrix, coriolis_matrix, B_matrix, \
+                            S_matrix, friction_vector, action_bar[t,:,:]))
+
+            diff_eq = [x_init, state_ddot]
 
             if self.args.plot_state:
-                plt.plt(tt, state_bar[:,0], 'b', label='qvel', fontweight='bold')
-                plt.plt(tt, state_bar[:,1], 'g', label='qpos', fontweight='bold')
-                plt.legend(loc='best')
-                plt.xlabel('t', fontweight='bold')
-                plt.ylabel('final q after integration', fontweight='bold')
-                plt.grid()
-                plt.gcf().set_size_inches(10,4)
-                plt.cla()
+                self._ax.plot(tt, state_bar[:,0], 'b', label='qvel', fontweight='bold')
+                self._ax.plot(tt, state_bar[:,1], 'g', label='qpos', fontweight='bold')
+                self._ax.legend(loc='best')
+                self._ax.set_xlabel('t', fontweight='bold')
+                self._ax.set_ylabel('final q after integration', fontweight='bold')
+                self._ax.grid()
+                self._ax.gcf().set_size_inches(10,4)
+                self._ax.cla()
 
                 if self.args.save_figs:
                     figs_dir = os.path.join(self.path, 'figures')
                     os.mkdir(figs_dir) if not os.path.exists(figs_dir) else None                    
-                    plt.savefig(figs_dir + '/state_' + repr(t), 
+                    self.fig.savefig(figs_dir + '/state_' + repr(t), 
                             bbox_inches='tight',facecolor='None')
 
             # state_bar = state_bar[0][::-1] # reverse the order of states to --> [q, qdot]
