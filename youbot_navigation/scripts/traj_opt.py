@@ -65,6 +65,7 @@ class TrajectoryOptimization(Dynamics):
         self.euler_step       = config['agent']['euler_step']
         self.euler_iter       = config['agent']['euler_iter']
         self.goal_state       = config['agent']['goal_state']
+        self.alpha            = config['agent']['alpha']
         self.action_penalty   = config['cost_params']['action_penalty']
         self.state_penalty    = config['cost_params']['state_penalty']
         self.wheel_rad        = self.wheel['radius']
@@ -104,14 +105,28 @@ class TrajectoryOptimization(Dynamics):
                 noise = noise / np.sqrt(variance)
         return noise
 
-    def get_action_cost_jacs(self, delta_state, delta_action, action_nominal):
-        l       = 0.5 *  np.sum(self.action_penalty * (delta_action ** 2), axis=0) + \
-                        self.stateself.goal_state
-        l_nom   = 0.5 *  np.sum(self.action_penalty * (action_nominal ** 2), axis=0) # nominal cost about linear traj
-        lu  = self.action_penalty * delta_action
-        lx  = np.zeros((self.dX))
-        luu = np.tile(np.diag(self.action_penalty), [1, 1])
-        lxx = np.zeros((self.dX, self.dX))
+    def get_action_cost_jacs(self, delta_state, delta_action, action_nominal, \
+                                B_matrix):
+        state_diff    = delta_state - self.goal_state
+        state_diff_sq = (delta_state - self.goal_state)**2
+        state_diff_nom_sq = (nominal_state - self.goal_state)**2
+        l       = (0.5/self.wheel_rad) *  B_matrix.T.dot(np.sum(\
+                    self.action_penalty * (delta_action ** 2), axis=0)) + \
+                  0.5 * self.state_penalty * state_diff_sq + \
+                  np.sqrt(self.alpha + state_diff_sq)
+        # nominal cost about linear traj
+        l_nom   = (0.5/self.wheel_rad) *  B_matrix.T.dot(np.sum(\
+                    self.action_penalty * (action_nominal ** 2), axis=0)) + \
+                  0.5 * self.state_penalty * state_diff_nom_sq + \
+                  np.sqrt(self.alpha + state_diff_nom_sq)
+        lu  = (1/self.wheel_rad) * B_matrix.T.dot(np.sum(self.action_penalty * delta_action), axis=0)
+        lx  = state_diff.dot(np.tile(np.diag(self.state_penalty), [1, 1])  + 1/np.sqrt(self.alpha + state_diff_sq))
+        luu = (1/self.wheel_rad) * B_matrix.T.dot(\
+                np.tile(np.diag(self.action_penalty), [1, 1]))
+        lxx = np.tile(np.diag(self.state_penalty), [1, 1]) + \
+                1/np.sqrt(self.alpha + state_diff_sq).dot(
+                np.eye(dX) - state_diff_sq.divide((self.alpha + state_diff_sq)**3)
+                )
         lux = np.zeros((self.dU, self.dX))
 
         # generate random noise
@@ -224,7 +239,7 @@ class TrajectoryOptimization(Dynamics):
                                     delta_state[t,:] - np.mean(delta_state[t,:]))
 
             stage_jacs = self.get_action_cost_jacs(delta_state[t,:], delta_action[t,:], \
-                                action_nominal[t,:])
+                                action_nominal[t,:], B_matrix)
 
             # assemble LQG state approx and cost
             if noisy:

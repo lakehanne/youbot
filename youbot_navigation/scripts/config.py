@@ -23,6 +23,7 @@ config = dict(
 		'dV': 4,
 		'dX': 3, # includes velocity terms
 		'dO': 3,
+		'alpha': 1.0,
 		'euler_step': 1e-2,  # step for the euler integrator
 		'euler_iter': 50,  # step for the euler integrator
 	    'smooth_noise': True,
