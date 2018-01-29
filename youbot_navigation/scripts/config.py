@@ -8,23 +8,26 @@ _,_,des_theta = euler_from_quaternion(des_quat, axes='sxyz')
 config = dict(
 
 	cost_params = {
-		'T': 100,
-		'dU': 4,
-		'dX': 3, # includes velocity terms; shape of state
-		'penalty': 0.0001,
+		'action_penalty': np.array([0.0001, 0.0001, 0.0001]),
+		'state_penalty': np.array([1, 1, 1]),
 		'final_cost_weight': 1e-2,
 		'stage_cost_weight': 1e-2,
 	},
 
-	agent = {		
-		# 'goal_state': np.asarray([[-1.42604078657e-07, 7.64165118802e-08, des_theta, 
+	agent = {
+		# 'goal_state': np.asarray([[-1.42604078657e-07, 7.64165118802e-08, des_theta,
 		# 	                                    0, 0, 0]]).T,
-		'goal_state': np.asarray([[-1.42604078657e-07, 7.64165118802e-08, des_theta]]).T,		
+		'goal_state': np.asarray([-1.42604078657e-07, 7.64165118802e-08, des_theta]).T,
 		'T': 100,
 		'dU': 4,
-		'dV': 4,		
+		'dV': 4,
 		'dX': 3, # includes velocity terms
-		'dO': 3,	
+		'dO': 3,
+		'euler_step': 1e-2,  # step for the euler integrator
+		'euler_iter': 50,  # step for the euler integrator
+	    'smooth_noise': True,
+	    'smooth_noise_var': 2.0,
+	    'smooth_noise_renormalize': True,
 	},
 
 	linearized_params = {
@@ -43,11 +46,11 @@ config = dict(
 		}
 )
 
-    # position: 
+    # position:
     #   x: -1.42604078657e-07
     #   y: 7.64165118802e-08
     #   z: 0.150000000174
-    # orientation: 
+    # orientation:
     #   x: -4.09248993761e-11
     #   y: 2.78940370874e-11
     #   z: -2.1263232087e-07
