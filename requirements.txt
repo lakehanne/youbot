@@ -1,2 +1,2 @@
-scipy
+0scipy
 numpy

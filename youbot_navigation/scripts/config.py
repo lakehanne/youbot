@@ -6,7 +6,8 @@ des_quat =  [1.0, 2.78940370874e-11, -4.09248993761e-11, -2.1263232087e-07]
 _,_,des_theta = euler_from_quaternion(des_quat, axes='sxyz')
 
 config = dict(
-
+    num_samples =  5,
+	conditions = 4,
 	cost_params = {
 		'action_penalty': np.array([0.0001, 0.0001, 0.0001]),
 		'state_penalty': np.array([1, 1, 1]),
