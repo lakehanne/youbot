@@ -64,7 +64,7 @@ class Dynamics(MassMaker):
                       self.wheel['friction'], self.wheel['friction'],
                       self.wheel['friction'], self.wheel['friction']
                      ])
-        f = np.expand_dims(f, axis=1)
+        # f = np.expand_dims(f, axis=1)
         base_footprint_dim = 0.001  # retrieved from the box geom in gazebo
         l = np.sqrt(2* base_footprint_dim)
         l_sqr = 2* base_footprint_dim
@@ -121,9 +121,9 @@ class Dynamics(MassMaker):
 
         LOGGER.debug("Time between motions: {}".format(time_delta))
 
-        q       = np.expand_dims(np.array([x, y, theta]), axis=1)
-        qdot    = np.expand_dims(np.array([xdot, ydot, theta_dot]), axis=1)
-        qdotdot = np.expand_dims(np.array([xaccel, yaccel, theta_accel]), axis=1)
+        q       = np.array([x, y, theta]) #np.expand_dims(np.array([x, y, theta]), axis=1)
+        qdot    = np.array([xdot, ydot, theta_dot]) #np.expand_dims(np.array([xdot, ydot, theta_dot]), axis=1)
+        qdotdot = np.array([xaccel, yaccel, theta_accel]) #np.expand_dims(np.array([xaccel, yaccel, theta_accel]), axis=1)
 
         # C matrix components
         c13 = mb * theta_dot * (d1 * np.cos(theta) - d2 * np.sin(theta))
@@ -151,9 +151,9 @@ class Dynamics(MassMaker):
         Phi_right_mat[0,1] = np.sin(theta)
         Phi_right_mat[1,0] = -np.sin(theta)
 
-        Phi_right_vector   = np.expand_dims(
-                                np.asarray([xdot, ydot, theta_dot]),
-                                axis=1)
+        Phi_right_vector   = np.asarray([xdot, ydot, theta_dot]) #np.expand_dims(
+                                # np.asarray([xdot, ydot, theta_dot]),
+                                # axis=1)
         # assemble Phi vector  --> will be 4 x 1
         Phi_dot = Phi_coeff * Phi_left_mat.dot(Phi_right_mat).dot(Phi_right_vector)
 

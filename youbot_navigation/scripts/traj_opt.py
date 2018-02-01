@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# coding=utf-8
 
 import os
 import imp
@@ -11,13 +12,15 @@ import argparse
 import threading
 import numpy as np
 import scipy as sp
+from numpy.linalg import LinAlgError
 from nav_msgs.msg import Odometry
 import scipy.ndimage as sp_ndimage
 from collections import namedtuple
 from scipy.integrate import odeint, RK45
 
-from scripts.dynamics import
+from scripts.dynamics import Dynamics
 from scripts.sample import SampleList
+from scripts.algorithm_utils import TrajectoryInfo
 
 import rospkg
 
@@ -80,12 +83,13 @@ class TrajectoryOptimization(Dynamics):
         self._ax = self.fig.gca()
         plt.ioff()
 
-        self.traj_distr = namedtuple('TrajDistr', ['Vx', 'Vxx', 'Qx', \
-                    'Qu', 'Qxx', 'Qux', 'Quu', \
-                    'fx', 'fu',  'action', 'action_nominal', 'delta_action', \
-                    'state', 'nominal_state', 'delta_state', 'delta_state_plus', \
-                    'gain_openloop', 'gain_closedloop'],
-                    verbose=False)
+        # self.traj_distr = namedtuple('TrajDistr', ['Vx', 'Vxx', 'Qx', \
+        #             'Qu', 'Qxx', 'Qux', 'Quu', \
+        #             'fx', 'fu',  'action', 'action_nominal', 'delta_action', \
+        #             'state', 'nominal_state', 'delta_state', 'delta_state_plus', \
+        #             'gu', 'Gu'],
+        #             verbose=False)
+        self.traj_distr =  TrajectoryInfo(config)
 
     def generate_noise(self, T, dU, agent):
         """
@@ -115,29 +119,39 @@ class TrajectoryOptimization(Dynamics):
                 noise = noise / np.sqrt(variance)
         return noise
 
-    def get_action_cost_jacs(self,  B_matrix):
-        state_diff    = self.traj_distr.delta_state - self.goal_state
-        state_diff_sq = (self.traj_distr.delta_state - self.goal_state)**2
-        state_diff_nom_sq = (self.traj_distr.nominal_state - self.goal_state)**2
-        l       = (0.5/self.wheel_rad) *  B_matrix.T.dot(np.sum(\
-                    self.action_penalty * (self.traj_distr.delta_action ** 2), axis=0)) + \
-                  0.5 * self.state_penalty * state_diff_sq + \
-                  np.sqrt(self.alpha + state_diff_sq)
+    def get_action_cost_jacs(self,  B_matrix, t):
+        state_diff     = np.expand_dims(self.traj_distr.delta_state[t,:] - self.goal_state, 1)
+        state_diff_nom = np.expand_dims((self.traj_distr.nominal_state[t,:] - self.goal_state), 1)
+
+        cost_action_term = self.action_penalty[0] * np.expand_dims(self.traj_distr.delta_action[t,:], axis=0).dot(\
+                            np.expand_dims(self.traj_distr.delta_action[t,:], axis=1))
+        cost_state_term  = 0.5 * self.state_penalty[0] * state_diff.T.dot(state_diff)
+        cost_l12_term    = np.sqrt(self.alpha + state_diff.T.dot(state_diff))                            
+
+        # nominal action
+        cost_nom_action_term = self.action_penalty[0] * np.expand_dims(self.traj_distr.action_nominal[t,:], axis=0).dot(\
+                                                        np.expand_dims(self.traj_distr.action_nominal[t,:], axis=1))
+        cost_nom_state_term  = 0.5 * self.state_penalty[0] * state_diff_nom.T.dot(state_diff_nom)
+        cost_nom_l12_term    = np.sqrt(self.alpha + state_diff_nom.T.dot(state_diff_nom))  
+
+        #system cost
+        l       = cost_action_term + cost_state_term + cost_l12_term
         # nominal cost about linear traj
-        l_nom   = (0.5/self.wheel_rad) *  B_matrix.T.dot(np.sum(\
-                    self.action_penalty * (self.traj_distr.action_nominal ** 2), axis=0)) + \
-                  0.5 * self.state_penalty * state_diff_nom_sq + \
-                  np.sqrt(self.alpha + state_diff_nom_sq)
-        # lu  = (1/self.wheel_rad) * B_matrix.T.dot(np.sum((self.action_penalty * delta_action), axis=0))
-        lu      = np.sum((self.action_penalty * self.traj_distr.delta_action), axis=0)
-        lx      = state_diff.dot(np.tile(np.diag(self.state_penalty), [1, 1])  + 1/np.sqrt(self.alpha + state_diff_sq))
-        # luu = (1/self.wheel_rad) * B_matrix.T.dot(\
-        #         np.tile(np.diag(self.action_penalty), [1, 1]))
-        luu     = np.tile(np.diag(self.action_penalty), [1, 1])
-        lxx     = np.tile(np.diag(self.state_penalty), [1, 1]) + \
-                1/np.sqrt(self.alpha + state_diff_sq).dot(
-                np.eye(self.dX) - state_diff_sq.divide((self.alpha + state_diff_sq)**3)
-                )
+        l_nom   = cost_nom_action_term + cost_nom_state_term + cost_nom_l12_term
+        # first order derivatives
+        lu      = self.action_penalty * self.traj_distr.delta_action[t,:]
+
+        lx      = state_diff.dot(
+                                    self.state_penalty + \
+                                    np.tile(1/np.sqrt(self.alpha + state_diff.T.dot(state_diff)), [self.dX])
+                                )
+        luu     = np.diag(self.action_penalty)
+
+        lxx_t1 = np.diag(self.state_penalty) 
+        lxx_t2 = np.eye(self.dX)
+        lxx_t3 = (state_diff.T.dot(state_diff)) / ((self.alpha + state_diff.T.dot(state_diff))**3) 
+        lxx    = lxx_t1 +  lxx_t2 * np.eye(self.dX) - lxx_t3 * np.eye(self.dX)
+
         lux = np.zeros((self.dU, self.dX))
 
         # generate random noise
@@ -150,53 +164,14 @@ class TrajectoryOptimization(Dynamics):
                                           'luu', 'lux', 'noise'], verbose=False)
         return CostJacs
 
-    def do_traj_opt(self, noisy=False):
+    def do_traj_opt(self):
+
+        self.backward(noisy=False)
+
+    def backward(self, noisy=False):
         T  = self.T
         dU = self.dU
         dX = self.dX
-
-
-        # Allocate. # Allocate. # Allocate.
-        action          = np.zeros((T, dU))
-        action_nominal  = np.zeros((T, dU))
-        delta_action    = np.zeros((T, dU))
-        noise_covar     = np.zeros((T))  # covariance of dynamics brownian motion
-
-        # state allocations
-        state           = np.zeros((T, dX))
-        nominal_state   = np.zeros((T, dX))
-        nominal_state_  = np.zeros((self.euler_iter, dX)) # euler integration. Lordy, hope I'm right
-        delta_state     = np.zeros((T, dX))
-        delta_state_plus = np.zeros((T, dX))
-
-        # jacobians
-        fx              = np.zeros((T, dX, dX))
-        fu              = np.zeros((T, dX, dU))
-
-        # value function allocations.
-        Vxx = np.zeros((T, dX, dX))
-        Vx  = np.zeros((T, dX))
-
-        # Q function allocations
-        Qx  = np.zeros((T, dX))
-        Qu  = np.zeros((T, dU))
-        Quu = np.zeros((T, dU, dU))
-        Qux = np.zeros((T, dU, dX))
-        Qxx = np.zeros((T, dX, dX))
-
-        # gain matrices
-        gain_openloop   = np.zeros((T, dU))
-        gain_closedloop  = np.zeros((T, dU, dX))
-
-        self.traj_distr(Vx, Vxx, Qx, \
-                        Qu, Qxx, Qux, Quu, \
-                        fx, fu,  action, action_nominal, delta_action, \
-                        state, nominal_state, delta_state, delta_state_plus, \
-                        gain_openloop, gain_closedloop)
-
-        self.backward()
-
-    def backward(self):
 
         for t in range (T-1, -1, -1):
             # get body dynamics. Note that some of these are time varying parameters
@@ -222,8 +197,8 @@ class TrajectoryOptimization(Dynamics):
                                     B_matrix.T.dot(S_matrix).dot(friction_vector)
 
             # set up costs at time T
-            self.traj_distr.action[t,:]        = multiplier.dot(inv_dyn_eq)
-            self.traj_distr.state[t,:]         = q #np.r_[q, qvel]
+            self.traj_distr.action[t,:]        = multiplier.dot(inv_dyn_eq).squeeze()
+            self.traj_distr.state[t,:]         = q.squeeze() #np.r_[q, qvel]
 
             """
             see a generalized ILQG paper in 43rd CDC section V.
@@ -235,12 +210,16 @@ class TrajectoryOptimization(Dynamics):
             LOGGER.debug("Integrating inverse dynamics equation")
 
             mass_inv            = -np.linalg.inv(mass_matrix)
+            # print('2nd term: {}'.format(mass_inv.dot(B_matrix.T).dot(S_matrix).dot(friction_vector).squeeze().shape))
+            # print('into: {}'.format(self.traj_distr.nominal_state_[1,:].shape ))
+            # print('first term: {}, 2nd term: {} all mult: {}'.format(mass_inv.dot(B_matrix.T).shape, \
+            #         self.traj_distr.action_nominal[t,:].shape, ((mass_inv.dot(B_matrix.T).dot(self.traj_distr.action_nominal[t,:]))/self.wheel_rad).shape))
             for n in range(1, self.euler_iter):
                 self.traj_distr.nominal_state_[n,:] = self.traj_distr.nominal_state_[n-1,:] + \
-                                self.euler_step * (mass_inv.dot(coriolis_matrix).dot(self.traj_distr.nominal_state[t,:]) - \
-                                mass_inv.dot(B_matrix.T).dot(S_matrix).dot(friction_vector) + \
-                                mass_inv.dot(B_matrix.T).dot(self.traj_distr.action_nominal[t,:])/self.wheel_rad)
-            nominal_state[t,:] = nominal_state_[n,:] # decode nominal state at last euler step
+                                self.euler_step * (mass_inv.dot(coriolis_matrix).dot(self.traj_distr.nominal_state[t,:])) - \
+                                mass_inv.dot(B_matrix.T).dot(S_matrix).dot(friction_vector)+ \
+                                (mass_inv.dot(B_matrix.T).dot(self.traj_distr.action_nominal[t,:]))/self.wheel_rad
+            self.traj_distr.nominal_state[t,:] = self.traj_distr.nominal_state_[n,:] # decode nominal state at last euler step
 
             if self.args.plot_state:
                 self._ax.plot(self.traj_distr.nominal_state[t:,:], 'b', label='qpos', fontweight='bold')
@@ -266,7 +245,7 @@ class TrajectoryOptimization(Dynamics):
                 noise_covar[t] = (self.traj_distr.delta_state[t,:] - np.mean(self.traj_distr.delta_state[t,:])).T.dot(\
                                     self.traj_distr.delta_state[t,:] - np.mean(self.traj_distr.delta_state[t,:]))
 
-            stage_jacs = self.get_action_cost_jacs(B_matrix)
+            stage_jacs = self.get_action_cost_jacs(B_matrix, t)
 
             # assemble LQG state approx and cost
             if noisy:
@@ -296,7 +275,7 @@ class TrajectoryOptimization(Dynamics):
 
             # Compute Cholesky decomposition of Q function action component.
             try:
-                U = sp.linalg.cholesky(Quu[t, :, :])
+                U = sp.linalg.cholesky(self.traj_distr.Quu[t, :, :])
                 L = U.T
             except LinAlgError as e:
                 # Error thrown when Qtt[idx_u, idx_u] is not
@@ -306,24 +285,19 @@ class TrajectoryOptimization(Dynamics):
                 break
 
             # compute open and closed loop gains.
-            self.traj_distr.gain_openloop[t, :] = -sp.linalg.solve_triangular(
+            self.traj_distr.gu[t, :] = -sp.linalg.solve_triangular(
                 U, sp.linalg.solve_triangular(L, self.traj_distr.Qu[t, :], lower=True)
             )
-            self.traj_distr.gain_closedloop[t, :, :] = -sp.linalg.solve_triangular(
+            self.traj_distr.Gu[t, :, :] = -sp.linalg.solve_triangular(
                 U, sp.linalg.solve_triangular(L, self.traj_distr.Qux[t, :, :], lower=True)
             )
 
             # calculate value function
-            self.traj_distr.Vxx[t,:,:] = self.traj_distr.Qxx[t, :,:] + self.traj_distr.Qux[t,:,:].T.dot(self.traj_distr.gain_closedloop[t,:,:])
-            self.traj_distr.Vx[t,:] = self.traj_distr.Qx[t,:] + self.traj_distr.gain_openloop[t,:].T.dot(self.traj_distr.Qux[t,:,:])
+            self.traj_distr.Vxx[t,:,:] = self.traj_distr.Qxx[t, :,:] + self.traj_distr.Qux[t,:,:].T.dot(self.traj_distr.Gu[t,:,:])
+            self.traj_distr.Vx[t,:] = self.traj_distr.Qx[t,:] + self.traj_distr.gu[t,:].T.dot(self.traj_distr.Qux[t,:,:])
 
             # symmetrize quadratic Value hessian
             self.traj_distr.Vxx[t,:,:] = 0.5 * (self.traj_distr.Vxx[t,:,:] + self.traj_distr.Vxx[t,:,:].T)
-
-    def run_backward_pass(self):
-        raise NotImplementedError("Must be implemented in derived class.")
-        # self.final_cost = 0.5 * (diff).T.dot(diff)
-
 
 if __name__ == '__main__':
 

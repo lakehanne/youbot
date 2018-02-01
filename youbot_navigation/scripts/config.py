@@ -9,7 +9,7 @@ config = dict(
     num_samples =  5,
 	conditions = 4,
 	cost_params = {
-		'action_penalty': np.array([0.0001, 0.0001, 0.0001]),
+		'action_penalty': np.array([0.0001, 0.0001, 0.0001, 0.0001]),
 		'state_penalty': np.array([1, 1, 1]),
 		'final_cost_weight': 1e-2,
 		'stage_cost_weight': 1e-2,
@@ -25,6 +25,7 @@ config = dict(
 		'dX': 3, # includes velocity terms
 		'dO': 3,
 		'alpha': 1.0,
+		'conditions': 4,
 		'euler_step': 1e-2,  # step for the euler integrator
 		'euler_iter': 50,  # step for the euler integrator
 	    'smooth_noise': True,
