@@ -26,20 +26,27 @@ class TrajectoryInfo(BundleType):
         euler_iter  = config['agent']['euler_iter']
 
         variables   = {
+                        'V':                np.zeros((T)),
                         'Vx':               np.zeros((T, dX)),
-                        'Vxx':              np.zeros((T, dX, dX)), 
-                        'Qx':               np.zeros((T, dX)), 
-                        'Qu':               np.zeros((T, dU)), 
-                        'Qxx':              np.zeros((T, dX, dX)), 
-                        'Qux':              np.zeros((T, dU, dX)), 
+                        'Vxx':              np.zeros((T, dX, dX)),
+                        'Qx':               np.zeros((T, dX)),
+                        'Qu':               np.zeros((T, dU)),
+                        'Qxx':              np.zeros((T, dX, dX)),
+                        'Qux':              np.zeros((T, dU, dX)),
                         'Quu':              np.zeros((T, dU, dU)),
-                        'fx':               np.zeros((T, dX, dX)), 
-                        'fu':               np.zeros((T, dX, dU)),  
-                        'action':           np.zeros((T, dU)), 
-                        'action_nominal':   np.zeros((T, dU)), 
-                        'delta_action':     np.zeros((T, dU)), 
-                        'state':            np.zeros((T, dX)), 
-                        'nominal_state':    np.zeros((T, dX)), 
+                        'Qx':               np.zeros((T, dX)),
+                        'Qu_tilde':         np.zeros((T, dU)),
+                        'Qux_tilde':        np.zeros((T, dU, dX)),
+                        'Quu_tilde':        np.zeros((T, dU, dU)),
+                        'fx':               np.zeros((T, dX, dX)),
+                        'fu':               np.zeros((T, dX, dU)),
+                        'fuu':              np.zeros((T, dU, dU)),
+                        'fux':              np.zeros((T, dU, dX)),
+                        'action':           np.zeros((T, dU)),
+                        'action_nominal':   np.zeros((T, dU)),
+                        'delta_action':     np.zeros((T, dU)),
+                        'state':            np.zeros((T, dX)),
+                        'nominal_state':    np.zeros((T, dX)),
                         'nominal_state_':   np.zeros((euler_iter, dX)),
                         'delta_state':      np.zeros((T, dX)),
                         'delta_state_plus': np.zeros((T, dX)),
@@ -57,4 +64,3 @@ def extract_condition(hyperparams, m):
     """
     return {var: val[m] if isinstance(val, list) else val
             for var, val in hyperparams.items()}
-
