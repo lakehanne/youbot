@@ -26,8 +26,8 @@ config = dict(
 		'dO': 3,
 		'alpha': 1.0,
 		'conditions': 4,
-		'delta': 1, # initial value of step size used in adjusting delta
-        'mu': 1e-4, # init regularizer
+		'delta': 1e-4, # initial value of step size used in adjusting delta
+        'mu': 1e-6, # init regularizer
         'mu_min': 1e-6, # regularization min
         'delta_nut': 2,  # for regularization schedule
 		'euler_step': 1e-2,  # step for the euler integrator

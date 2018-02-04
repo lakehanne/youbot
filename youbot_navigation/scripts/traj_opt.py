@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # coding=utf-8
 
+from __future__ import print_function
+
 import os
 import imp
 import time
@@ -39,19 +41,19 @@ parser.add_argument('--plot_state', '-ps', action='store_true', default=False,
                         help='plot nominal trajectories' )
 parser.add_argument('--save_fig', '-sf', action='store_true', default=True,
                         help='save plotted figures' )
-parser.add_argument('--silent', '-si', action='store_true', default='False',
+parser.add_argument('--silent', '-si', action='store_false', default='False',
                         help='max num iterations' )
 args = parser.parse_args()
 
+
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
+
 LOGGER = logging.getLogger(__name__)
 
 if args.silent:
     LOGGER.setLevel(logging.INFO)
 else:
     LOGGER.setLevel(logging.DEBUG)
-
-
 print(args)
 
 class TrajectoryOptimization(Dynamics):
@@ -62,7 +64,7 @@ class TrajectoryOptimization(Dynamics):
         super(TrajectoryOptimization, self).__init__(Dynamics(Odometry, rate=rate))
 
         self.args            = arg
-        self.pool_derivatives= Pool(processes=2)
+        # self.pool_derivatives= Pool(processes=2)
 
         self.hyperparams      = hyperparams
         config                = self.hyperparams.config
@@ -120,7 +122,7 @@ class TrajectoryOptimization(Dynamics):
                 noise = noise / np.sqrt(variance)
         return noise
 
-    def get_action_cost_jacs(self,  B_matrix, t):
+    def get_action_cost_jacs(self, t, noisy=False):
         # get body dynamics. Note that some of these are time varying parameters
         body_dynamics = self.assemble_dynamics()
 
@@ -136,6 +138,7 @@ class TrajectoryOptimization(Dynamics):
         # this should be time-varying but is constant for now
         friction_vector = body_dynamics.f
 
+        # print('q: {}, \n qvel: {} \n qaccel: {}'.format(q, qvel, qaccel))
         # calculate inverse dynamics equation
         BBT             = B_matrix.dot(B_matrix.T)
         Inv_BBT         = np.linalg.inv(BBT)
@@ -143,9 +146,10 @@ class TrajectoryOptimization(Dynamics):
         inv_dyn_eq      = mass_matrix.dot(qaccel) + coriolis_matrix.dot(qvel) + \
                                 B_matrix.T.dot(S_matrix).dot(friction_vector)
 
+        # print('inv_dyn_eq: {}'.format(inv_dyn_eq))
         # set up costs at time T
         self.traj_distr.action[t,:]        = multiplier.dot(inv_dyn_eq).squeeze()
-        self.traj_distr.state[t,:]         = q.squeeze() #np.r_[q, qvel]
+        self.traj_distr.state[t,:]         = q.squeeze()
 
         """
         see a generalized ILQG paper in 43rd CDC | section V.
@@ -153,9 +157,8 @@ class TrajectoryOptimization(Dynamics):
         """
         self.traj_distr.fx[t,:,:]          = np.eye(self.dX) -self.euler_step * np.linalg.inv(mass_matrix).dot(coriolis_matrix)
         self.traj_distr.fu[t,:,:]          = -(self.euler_step * self.wheel_rad) * np.linalg.inv(mass_matrix).dot(B_matrix.T)
-        self.traj_distr.fuu[t,:,:]          = -(self.euler_step * self.wheel_rad) * np.linalg.inv(mass_matrix).dot(B_matrix.T)
-
-        LOGGER.debug("Integrating inverse dynamics equation")
+        # self.traj_distr.fuu[t,:,:]         = np.zeros((self.dU, self.dU))
+        print("Integrating inverse dynamics equation")
 
         mass_inv            = -np.linalg.inv(mass_matrix)
         for n in range(1, self.euler_iter):
@@ -203,41 +206,55 @@ class TrajectoryOptimization(Dynamics):
         cost_nom_state_term  = 0.5 * self.state_penalty[0] * state_diff_nom.T.dot(state_diff_nom)
         cost_nom_l12_term    = np.sqrt(self.alpha + state_diff_nom.T.dot(state_diff_nom))
 
+        # print('\naction: {} \n state: {}'.format(self.traj_distr.action[t,:], \
+        #         self.traj_distr.state[t,:]))
+        # print('\nnom_action: {} \n nom_state: {}'.format(self.traj_distr.action_nominal[t,:], \
+        #         self.traj_distr.nominal_state[t,:]))        
+        # print('\ndel x: {}, \n del u: {}'.format(self.traj_distr.delta_state[t,:], \
+        #         self.traj_distr.delta_action[t,:]))
+        # print('\ncost_nom_action_term: {} \ncost_nom_state_term: {} \ncost_nom_l12_term: {}'.format(
+        #     cost_nom_action_term, cost_nom_state_term, cost_nom_l12_term))
+
         #system cost
         l       = cost_action_term + cost_state_term + cost_l12_term
         # nominal cost about linear traj
         l_nom   = cost_nom_action_term + cost_nom_state_term + cost_nom_l12_term
         # first order derivatives
         lu      = self.action_penalty * self.traj_distr.delta_action[t,:]
-
-        lx      = state_diff.dot(
-                                    self.state_penalty + \
-                                    np.tile(1/np.sqrt(self.alpha + state_diff.T.dot(state_diff)), [self.dX])
-                                )
+        lx      = self.state_penalty[0] * state_diff + state_diff/np.sqrt(self.alpha + state_diff.T.dot(state_diff))
+                                   
         luu     = np.diag(self.action_penalty)
 
         lxx_t1 = np.diag(self.state_penalty)
         lxx_t2 = np.eye(self.dX)
         lxx_t3 = (state_diff.T.dot(state_diff)) / ((self.alpha + state_diff.T.dot(state_diff))**3)
         lxx    = lxx_t1 +  lxx_t2 * np.eye(self.dX) - lxx_t3 * np.eye(self.dX)
-
-        lux = np.zeros((self.dU, self.dX))
+        lux    = np.zeros((self.dU, self.dX))
 
         # generate random noise
         noise = self.generate_noise(self.T, self.dU, self.hyperparams.config['agent'])
 
+        # print('fx: {} \n fu: {}'.format(self.traj_distr.fx[t,:,:], self.traj_distr.fu[t,:,:]))
+
+        # squeeze dims of first order derivatives
+        if lx.ndim > 1:
+            lx = lx.squeeze()
+        if lu.ndim > 1:
+            lu = lu.squeeze()
+        # print('l: {} \nlx: {}, \nlu: {} \nluu: {}\nlxx: {}'.format(
+        #         l, lx.shape, lu.shape, luu.shape, lxx.shape))
 
         # assemble the cost's first order moments ell
         # pass
         CostJacs = namedtuple('CostJac', ['l', 'lx', 'lu', 'lxx', 'l_nom', \
                                           'luu', 'lux', 'noise'], verbose=False)
-        return CostJacs
+        return CostJacs(l=l, lx=lx, lu=lu, lxx=lxx, l_nom=l_nom, luu=luu, lux=lux, noise=noise)
 
     def reg_sched(self, increase=False):
         # increase mu
         if increase:
             self.delta = max(self.delta_nut, self.delta * self.delta_nut)
-            mu = max( self.mu_min, self.mu * self.delta)
+            mu = self.mu * 1.1 #max(self.mu_min, self.mu * self.delta) #
         else:
             self.delta = min(1/self.delta_nut, self.delta/self.delta_nut)
             if self.mu * self.delta > self.mu_min:
@@ -257,32 +274,32 @@ class TrajectoryOptimization(Dynamics):
         dX = self.dX
 
         non_pos_def = True
-        while non_pos_def:
+        while (non_pos_def):
 
             non_pos_def = False
-
+            print('restarting back pass')
             for t in range (T-1, -1, -1):
                 """
                 get derivatives in a different execution thread. Following Todorov's
                 recommendation in synthesis and stabilization paper
                 """
-                self.pool_derivatives.apply_async(self.get_action_cost_jacs, \
-                                args=(B_matrix, t))
+                # self.pool_derivatives.apply_async(self.get_action_cost_jacs, \
+                #                 args=(t))
+                stage_jacs = self.get_action_cost_jacs(t)
 
-                # assemble LQG state approx and cost
-                """
-                if noisy:
-                    self.traj_distr.delta_state_plus[t,:] = self.traj_distr.fx[t,:,:].dot(self.traj_distr.delta_state[t,:]) + \
-                                            self.traj_distr.fu[t,:,:].dot(self.traj_distr.delta_action[t,:]) + \
-                                            stage_jacs.noise
-                else:
-                    self.traj_distr.delta_state_plus[t,:] = self.traj_distr.fx[t,:,:].dot(self.traj_distr.delta_state[t,:]) + \
-                                            self.traj_distr.fu[t,:,:].dot(self.traj_distr.delta_action[t,:])
-                """
+                self.traj_distr.Qx[t,:]     = stage_jacs.lx
+                self.traj_distr.Qu[t,:]     = stage_jacs.lu
+                self.traj_distr.Qxx[t,:,:]  = stage_jacs.lxx
+                self.traj_distr.Qux[t,:,:]  = stage_jacs.lux
+                self.traj_distr.Quu[t,:,:]  = stage_jacs.luu
+                self.traj_distr.Quu_tilde[t,:,:]  = stage_jacs.luu
+
                 # form Q derivatives at time t first
                 if t < T-1:
                     # wil be --> (3) + (3x3) x (3) ==> (3)
                     self.traj_distr.Qx[t,:] = stage_jacs.lx + self.traj_distr.fx[t,:].T.dot(self.traj_distr.Vx[t+1,:])
+                    # print('lx: {} \n fx: {} \nVx\':{} \nQx: {}'.format(
+                    #     stage_jacs.lx, self.traj_distr.fx[t,:], self.traj_distr.Vx[t+1,:], self.traj_distr.Qx[t,:]) )
                     # wil be --> (4) + (4,3) x (3) ==> (4)
                     self.traj_distr.Qu[t,:] = stage_jacs.lu + self.traj_distr.fu[t,:].T.dot(self.traj_distr.Vx[t+1,:])
                     # wil be --> (3) + (3,3) x (3,3) x ((3,3)) ==> (3,3)
@@ -293,32 +310,30 @@ class TrajectoryOptimization(Dynamics):
                     self.traj_distr.Quu[t,:,:]  = stage_jacs.luu + self.traj_distr.fu[t,:].T.dot(self.traj_distr.Vxx[t+1,:,:]).dot(self.traj_distr.fu[t,:])
 
                     # calculate the Qvals that penalize devs from the states
-                    self.traj_distr.Qu_tilde[t,:] = self.traj_distr.Qu[t,:] + self.mu
+                    self.traj_distr.Qu_tilde[t,:] = self.traj_distr.Qu[t,:] #+ self.mu * np.eye(self.traj_distr.Qu[t,:].shape[0])
                     self.traj_distr.Quu_tilde[t,:,:] = stage_jacs.luu + self.traj_distr.fu[t,:].T.dot(\
-                                    self.traj_distr.Vxx[t+1,:,:] + self.mu * np.eye(dX)).dot(self.traj_distr.fu[t,:])
-                                    # + self.traj_distr.Vx[t+1,:].dot(self.fuu[t,:,:])
+                                    self.traj_distr.Vxx[t+1,:,:] + self.mu * np.eye(dX)).dot(self.traj_distr.fu[t,:]) #+ \
+                                    # self.traj_distr.Vx[t+1,:].dot(self.traj_distr.fuu[t,:,:])
                     self.traj_distr.Qux_tilde[t,:,:] = stage_jacs.lux + self.traj_distr.fu[t,:].T.dot(\
-                                    self.traj_distr.Vxx[t+1,:,:] + self.mu * np.eye(dX)).dot(self.traj_distr.fx[t,:])
-                                    # + self.traj_distr.Vx[t+1,:].dot(self.fux[t,:,:])
+                                    self.traj_distr.Vxx[t+1,:,:] + self.mu * np.eye(dX)).dot(self.traj_distr.fx[t,:]) #+ \
+                                    # self.traj_distr.Vx[t+1,:].dot(self.traj_distr.fux[t,:,:])
 
                 # symmetrize the second order moments of Q
                 self.traj_distr.Quu[t,:,:] = 0.5 * (self.traj_distr.Quu[t].T + self.traj_distr.Quu[t])
                 self.traj_distr.Qxx[t,:,:] = 0.5 * (self.traj_distr.Qxx[t].T + self.traj_distr.Qxx[t])
+                print('Quu sym: \n{}  '.format(self.traj_distr.Quu[t,:,:]))
+                LOGGER.debug('Quu_tilde: ', self.traj_distr.Quu_tilde[t,:,:])
 
                 # symmetrize for improved Q state improvement values too
                 self.traj_distr.Quu_tilde[t,:,:] = 0.5 * (self.traj_distr.Quu_tilde[t].T + \
                             self.traj_distr.Quu_tilde[t])
-
                 # Compute Cholesky decomposition of Q function action component.
                 try:
-                    U = sp.linalg.cholesky(self.traj_distr.Quu[t, :, :])
-                    L = U.T
-
                     U_tilde = sp.linalg.cholesky(self.traj_distr.Quu_tilde[t,:,:])
                     L_tilde = U_tilde.T
                 except LinAlgError as e:
                     # Error thrown when Qtt[idx_u, idx_u]  or Q_tilde[u, u] is not spd
-                    LOGGER.debug('LinAlgError: %s', e)
+                    print('LinAlgError: %s', e)
                     non_pos_def = True
                     # restart the backward pass if Quu is non positive definite
                     break
@@ -339,7 +354,7 @@ class TrajectoryOptimization(Dynamics):
                 # calculate imporved value functions
                 self.traj_distr.Vxx[t,:,:] = self.traj_distr.Qxx[t, :,:] + \
                                 big_K.T.dot(self.traj_distr.Quu[t,:,:]).dot(big_K) + \
-                                big_K.T.dot(self.traj_distr.Qux[t,:,:]) +
+                                big_K.T.dot(self.traj_distr.Qux[t,:,:]) + \
                                 self.traj_distr.Qux[t,:,:].T.dot(self.traj_distr.Gu[t,:,:])
 
                 self.traj_distr.Vx[t,:] = self.traj_distr.Qx[t,:] + \
@@ -347,20 +362,20 @@ class TrajectoryOptimization(Dynamics):
                                 big_K.T.dot(self.traj_distr.Qu[t,:]) + \
                                 self.traj_distr.gu[t,:].T.dot(self.traj_distr.Qux[t,:,:])
 
-                self.traj_distr.V[t] = 0.5 * small_k.T.dot(self.traj_distr.Quu[t,:,:]).dot(small_k) + \
-                                        small_k.T.dot(self.traj_distr).dot(self.traj_distr.Qu[t,:])
+                # self.traj_distr.V[t] = 0.5 * small_k.T.dot(self.traj_distr.Quu[t,:,:]).dot(small_k) + \
+                #                         small_k.T.dot(self.traj_distr).dot(self.traj_distr.Qu[t,:])
                 # symmetrize quadratic Value hessian
                 self.traj_distr.Vxx[t,:,:] = 0.5 * (self.traj_distr.Vxx[t,:,:] + self.traj_distr.Vxx[t,:,:].T)
 
             if non_pos_def: # restart the back-pass process
-
-
-
                 old_mu = self.mu
                 self.reg_sched(increase=True)
-                LOGGER.debug('Increasing mu: %f -> %f', old_mu, self.mu)
+                LOGGER.debug("Hessian became non positive definite")
+                print('Increasing mu: {} -> {}'.format(old_mu, self.mu))
+                # break
 
-    def forward(self)
+    def forward(self):
+        pass
 
 if __name__ == '__main__':
 
@@ -372,10 +387,11 @@ if __name__ == '__main__':
 
 
     try:
+
         trajopt = TrajectoryOptimization(args, rate=30, hyperparams=hyperparams)
         rospy.init_node('trajectory_optimization')
 
-        LOGGER.debug('Started trajectory optimization node')
+        print('Started trajectory optimization node')
 
         while not rospy.is_shutdown():
             """
