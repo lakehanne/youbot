@@ -263,10 +263,87 @@ class TrajectoryOptimization(Dynamics):
                 self.mu = 0
         self.mu = mu
 
+    def get_inverse_dynamics(self, theta):
+        body_dynamics = self.assemble_dynamics()
+
+        # time varying inverse dynamics parameters
+        M     = body_dynamics.M
+        C     = body_dynamics.C
+        B     = body_dynamics.B
+        S     = body_dynamics.S
+        f     = body_dynamics.f
+
+        # update time-varying parameters of mass matrix
+        d1, d2  =  1e-2, 1e-2
+
+        mw, mb, r  = self.wheel['mass'], self.base['mass'], self.wheel['radius']
+        I, I_b     = self.wheel['mass_inertia'][1,1], self.base['mass_inertia'][-1,-1]
+         
+        base_footprint_dim = 0.001  # retrieved from the box geom in gazebo
+        l = np.sqrt(2* base_footprint_dim)
+
+        b, a = 0.19, 0.145 # meters as measured from the real robot
+        alpha = np.arctan2(b, a)
+
+        m13 = mb * ( d1 * np.sin(theta) + d2 * np.cos(theta) )
+        m23 = mb * (-d1 * np.cos(theta) + d2 * np.sin(theta) )
+        m33 = mb * (d1 ** 2 + d2 ** 2) + I_b + \
+                    8 * (mw + I/(r**2)) * l_sqr * pow(np.sin(np.pi/4.0 - alpha), 2)
+
+        # update mass_matrix
+        M[0,2], M[2,0], M[1,2], M[2,1] = m13, m13, m23, m23
+
+        # update B matrix
+        B[:,:2].fill(np.cos(theta) + np.sin(theta))
+        B[:,-1].fill(-np.sqrt(2)*l*np.sin(np.pi/4 - alpha))
+        B[0,0] = np.sin(theta) - np.cos(theta)
+        B[1,0] *= -1
+        B[2,0] = np.cos(theta) - np.sin(theta)
+        B[0,1]          = -1.0 * B[0,1]
+        B[1,1], B[3,1]  = B[2,0], B[0,0]
+
+        # calculate phi dor from eq 6
+        Phi_coeff = -(np.sqrt(2)/r) 
+        # mid matrix
+        Phi_left_mat = np.ones((4, 3))
+        Phi_left_mat[:,:2].fill(np.sqrt(2)/2)
+        Phi_left_mat[:,2].fill(l*np.sin(np.pi/4 - alpha))
+        # column 0
+        Phi_left_mat[2, 0] *= -1
+        Phi_left_mat[3, 0] *= -1
+        # column 1
+        Phi_left_mat[1, 1] *= -1
+        Phi_left_mat[2, 1] *= -1
+
+        Phi_right_mat = np.zeros((3,3))
+        Phi_right_mat[0,0] = np.cos(theta)
+        Phi_right_mat[1,1] = np.cos(theta)
+
+        Phi_right_mat[0,1] = np.sin(theta)
+        Phi_right_mat[1,0] = -np.sin(theta)
+
+        Phi_right_vector   = np.asarray([xdot, ydot, theta_dot]) #np.expand_dims(
+                                # np.asarray([xdot, ydot, theta_dot]),
+                                # axis=1)
+        # assemble Phi vector  --> will be 4 x 1
+        Phi_dot = Phi_coeff * Phi_left_mat.dot(Phi_right_mat).dot(Phi_right_vector)
+        S = np.diag(np.sign(Phi_dot).squeeze())
+
+        # print('q: {}, \n qvel: {} \n qaccel: {}'.format(q, qvel, qaccel))
+        # calculate inverse dynamics equation
+        BBT             = B.dot(B.T)
+        Inv_BBT         = np.linalg.inv(BBT)
+        multiplier      = Inv_BBT.dot(self.wheel_rad * B)
+        inv_dyn_eq      = M.dot(qaccel) + C.dot(qvel) + \
+                                B.T.dot(S).dot(f)
+
+        return inv_dyn_eq
 
     def do_traj_opt(self):
 
         self.backward(noisy=False)
+
+        self.forward()
 
     def backward(self, noisy=False):
         T  = self.T
@@ -283,8 +360,8 @@ class TrajectoryOptimization(Dynamics):
                 get derivatives in a different execution thread. Following Todorov's
                 recommendation in synthesis and stabilization paper
                 """
-                # self.pool_derivatives.apply_async(self.get_action_cost_jacs, \
-                #                 args=(t))
+                self.pool_derivatives.apply_async(self.get_action_cost_jacs, \
+                                args=(t))
                 stage_jacs = self.get_action_cost_jacs(t)
 
                 self.traj_distr.Qx[t,:]     = stage_jacs.lx
@@ -375,7 +452,29 @@ class TrajectoryOptimization(Dynamics):
                 # break
 
     def forward(self):
-        pass
+        T  = self.T
+        dU = self.dU
+        dX = self.dX
+
+        LOGGER.debug("stepped into forward pass of algorithm")
+        # update the states and controls 
+        for t in range(T):
+            self.pool_derivatives.apply_async(self.get_action_cost_jacs, \
+                                args=(t))
+            # stage_jacs = self.get_action_cost_jacs(t)
+            # update states
+            self.traj_distr.delta_state[t,:]  = self.traj_distr.state[t,:]  - self.traj_distr.nominal_state[t,:]
+            self.traj_distr.delta_action[t,:] = self.traj_distr.delta_action[t,:] + 
+                                                self.traj_distr.gu[t, :] + 
+                                                self.traj_distr.Gu[t, :].dot(self.traj_distr.delta_state[t,:])
+            # calculate state at t+1
+            theta = self.traj_distr.delta_state[t,:][-1]
+
+            theta_ddot = self.get_inverse_dynamics(theta)
+
+
+
+            self.traj_distr.state[t+1,:]      = 
 
 if __name__ == '__main__':
 

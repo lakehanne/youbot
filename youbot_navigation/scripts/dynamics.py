@@ -157,8 +157,6 @@ class Dynamics(MassMaker):
                                 # axis=1)
         # assemble Phi vector  --> will be 4 x 1
         Phi_dot = Phi_coeff * Phi_left_mat.dot(Phi_right_mat).dot(Phi_right_vector)
-
-        LOGGER.debug('Phi dot: {}, \n sign(Phi dot) {}'.format(Phi_dot.T, np.sign(Phi_dot).T))
         S = np.diag(np.sign(Phi_dot).squeeze())
 
         Dynamics = namedtuple('Dynamics', ['M', 'C', 'B', 'S', 'f', 'r', 'qaccel', 'qvel', 'q'], 
