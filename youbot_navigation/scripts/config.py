@@ -37,6 +37,10 @@ config = dict(
 	    'smooth_noise_renormalize': True,
 	},
 
+	trajectory = {
+		'init_action': 40,  # initial nominal toque for all four wheels of mobile base
+	},
+
 	linearized_params = {
 		    'x0': [np.array([0.5*np.pi, 0, 0, 0, 0, 0]),
 	           np.array([0.75*np.pi, 0.5*np.pi, 0, 0, 0, 0]),

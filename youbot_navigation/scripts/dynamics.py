@@ -19,18 +19,12 @@ LOGGER = logging.getLogger(__name__)
 class Dynamics(MassMaker):
     def __init__(self, Odometry, rate=10):
         super(Dynamics, self).__init__()
-        """
-        self.desired_pose = final pose that we would like the robot to reach
-        self.current_pose = current pose of the robot as obtained from odometric info
-        self.penalty = penalty incurred on control law
-        """
         self.rate = rate  # 10Hz
 
-        self.mat_maker = MassMaker()
-        self.mat_maker.get_mass_matrices()
-        self.body_dynamics = None
+        mat_maker = MassMaker()
+        mat_maker.get_mass_matrices()
 
-        self.__dict__.update(self.mat_maker.__dict__)
+        self.__dict__.update(mat_maker.__dict__)
 
     def odom_cb(self, odom):
         self.odom = odom
