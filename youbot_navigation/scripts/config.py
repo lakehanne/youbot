@@ -38,7 +38,9 @@ config = dict(
 	},
 
 	trajectory = {
-		'init_action': 40,  # initial nominal toque for all four wheels of mobile base
+		# retrieved from gazebo [-9.891485822039117, -10.830327455656795, -8.995303183020859, -7.821391440870244]
+		# 'init_action': 10,  # initial nominal toque for all four wheels of mobile base
+		'init_action': np.array([-9.891485822039117, -10.830327455656795, -8.995303183020859, -7.821391440870244])
 	},
 
 	linearized_params = {

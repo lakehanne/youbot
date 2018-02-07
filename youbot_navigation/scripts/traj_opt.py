@@ -43,9 +43,9 @@ parser.add_argument('--maxIter', '-mi', type=int, default='50',
                         help='max num iterations' )
 parser.add_argument('--plot_state', '-ps', action='store_true', default=False,
                         help='plot nominal trajectories' )
-parser.add_argument('--save_fig', '-sf', action='store_true', default=True,
+parser.add_argument('--save_fig', '-sf', action='store_false', default=True,
                         help='save plotted figures' )
-parser.add_argument('--silent', '-si', action='store_false', default='False',
+parser.add_argument('--silent', '-si', action='store_true', default=False,
                         help='max num iterations' )
 args = parser.parse_args()
 
@@ -98,7 +98,7 @@ class TrajectoryOptimization(Dynamics):
         self._ax = self.fig.gca()
 
         self.traj_distr =  TrajectoryInfo(config)
-        self.traj_distr.action_nominal.fill(config['trajectory']['init_action'])
+        self.traj_distr.action_nominal[:,] = config['trajectory']['init_action']
 
     def generate_noise(self, T, dU, agent):
         """
@@ -255,7 +255,7 @@ class TrajectoryOptimization(Dynamics):
                 self.mu = 0
         self.mu = mu
 
-    def get_new_state(self, theta):
+    def get_new_state(self, theta, t):
         body_dynamics = self.assemble_dynamics()
 
         # time varying inverse dynamics parameters
@@ -264,6 +264,8 @@ class TrajectoryOptimization(Dynamics):
         B     = body_dynamics.B
         S     = body_dynamics.S
         f     = body_dynamics.f
+        qvel  = body_dynamics.qvel
+        qaccel= body_dynamics.qaccel
 
         # update time-varying parameters of mass matrix
         d1, d2  =  1e-2, 1e-2
@@ -315,6 +317,10 @@ class TrajectoryOptimization(Dynamics):
         Phi_right_mat[0,1] = np.sin(theta)
         Phi_right_mat[1,0] = -np.sin(theta)
 
+        xdot = self.odom.twist.twist.linear.x
+        ydot = self.odom.twist.twist.linear.y
+        theta_dot = self.odom.twist.twist.angular.z
+
         Phi_right_vector   = np.asarray([xdot, ydot, theta_dot]) 
         # assemble Phi vector  --> will be 4 x 1
         Phi_dot = Phi_coeff * Phi_left_mat.dot(Phi_right_mat).dot(Phi_right_vector)
@@ -340,8 +346,10 @@ class TrajectoryOptimization(Dynamics):
 
     def do_traj_opt(self):
 
+        rospy.loginfo('running backward pass')
         self.backward(noisy=False)
 
+        rospy.loginfo('running forward pass')
         self.forward()
 
     def backward(self, noisy=False):
@@ -470,14 +478,20 @@ class TrajectoryOptimization(Dynamics):
             self.traj_distr.delta_action[t,:] = self.traj_distr.delta_action[t,:] \
                                                     + self.traj_distr.gu[t, :] \
                                                     + self.traj_distr.Gu[t, :].dot(self.traj_distr.delta_state[t,:])
-            # calculate state at t+1
+            
             theta = self.traj_distr.delta_state[t,:][-1]
 
+            rospy.logdebug('action nominal: {}'.format(self.traj_distr.action_nominal[t]))
+            rospy.logdebug('delta  action : {}'.format(self.traj_distr.delta_action[t]))
+            rospy.logdebug('action : {}'.format(self.traj_distr.action[t]))
+
+
+            duration = Duration(secs = 5, nsecs = 0) # apply effort continuously without end duration = -1
+            # update state at t+1
+            if t < T-1:
+                self.traj_distr.state[t+1,:]  = self.get_new_state(theta, t+1)
             torques = self.traj_distr.delta_action[t,:]
-
-            duration = Duration(secs = 10, nsecs = 0) # apply effort continuously without end duration = -1
-            self.traj_distr.state[t+1,:]  = self.get_new_state(theta)
-
+            # send in this order: 'wheel_joint_bl', 'wheel_joint_br', 'wheel_joint_fl', 'wheel_joint_fr'
             # create four different asynchronous threads for each wheel
             wheel_joint_bl_thread = threading.Thread(group=None, target=self.send_joint_torques, 
                                         name='wheel_joint_bl_thread', 
@@ -491,17 +505,34 @@ class TrajectoryOptimization(Dynamics):
             wheel_joint_fr_thread = threading.Thread(group=None, target=self.send_joint_torques, 
                                         name='wheel_joint_fr_thread', 
                                         args=(wheel_joint_fr, torques[3], start_time, duration))
-            print('\n\n')
+            
+            rospy.sleep(duration)
+
+            if args.silent:
+                print('\n\n')
+
             # https://docs.python.org/2/library/threading.html
             wheel_joint_bl_thread.daemon = True
             wheel_joint_br_thread.daemon = True
             wheel_joint_fl_thread.daemon = True
             wheel_joint_fr_thread.daemon = True
 
-            wheel_joint_bl_thread.start()
-            wheel_joint_br_thread.start()
+            # send torques to robot
+
             wheel_joint_fl_thread.start()
-            wheel_joint_fr_thread.start()     
+            wheel_joint_fr_thread.start() 
+            wheel_joint_bl_thread.start()
+            wheel_joint_br_thread.start()   
+
+            # if t < 5:
+                # timeout = t * 2
+            timeout=t
+            """
+            wait until last thread finishes before running the next time step
+            this places the for loop in a blocking call
+            """
+            # wheel_joint_fr_thread.join(timeout=timeout)  
+
 
     def send_joint_torques(self, *msg):  
 
@@ -509,7 +540,7 @@ class TrajectoryOptimization(Dynamics):
 
         try:
             send_torque = rospy.ServiceProxy('/gazebo/apply_joint_effort', ApplyJointEffort)
-            rospy.loginfo('sending {}N to {}'.format(msg[1], msg[0]))
+            rospy.logdebug('sending {}N to {}'.format(msg[1], msg[0]))
             resp = send_torque(msg[0], msg[1], msg[2], msg[3])
 
             return ApplyJointEffortResponse(resp.success, resp.status_message)
@@ -525,14 +556,14 @@ if __name__ == '__main__':
     hyperparams_file = scripts_dir + 'config.py'
     hyperparams = imp.load_source('hyperparams', hyperparams_file)
 
-    # if args.silent:
-    #     rospyloglevel = rospy.INFO
-    # else:
-    #     rospyloglevel = rospy.DEBUG
+    if args.silent:
+        log_level = rospy.INFO
+    else:
+        log_level = rospy.DEBUG
     try:
 
         trajopt = TrajectoryOptimization(args, rate=30, hyperparams=hyperparams)
-        rospy.init_node('trajectory_optimization', anonymous=True, log_level=rospy.INFO)
+        rospy.init_node('trajectory_optimization', anonymous=True, log_level=log_level)
 
         rospy.logdebug('Started trajectory optimization node')
 

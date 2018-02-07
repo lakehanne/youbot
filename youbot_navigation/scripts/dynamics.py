@@ -78,8 +78,8 @@ class Dynamics(MassMaker):
         ydot = self.odom.twist.twist.linear.y
         theta_dot = self.odom.twist.twist.angular.z
 
-        quaternion_dot = [1.0, self.odom.twist.twist.angular.y,
-                        self.odom.twist.twist.angular.x, self.odom.twist.twist.angular.z]
+        # quaternion_dot = [1.0, self.odom.twist.twist.angular.y,
+                        # self.odom.twist.twist.angular.x, self.odom.twist.twist.angular.z]
         # _, _, theta_dot = euler_from_quaternion(quaternion_dot, axes='sxyz')
         # theta_dot -= np.pi/2.0  # account for diffs of frames in gazebo and paper  
 
