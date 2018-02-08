@@ -34,7 +34,8 @@ mpl.use('QT4Agg')
 import matplotlib.pyplot as plt
 
 from gazebo_msgs.srv import ApplyJointEffort, ApplyJointEffortResponse,\
-                         ApplyBodyWrench, ApplyBodyWrenchResponse
+                         ApplyBodyWrench, ApplyBodyWrenchResponse, \
+                         JointRequest, BodyRequest
 
 roslib.load_manifest('youbot_navigation')
 
@@ -518,7 +519,6 @@ class TrajectoryOptimization(Dynamics):
             wheel_joint_fr_thread.daemon = True
 
             # send torques to robot
-
             wheel_joint_fl_thread.start()
             wheel_joint_fr_thread.start() 
             wheel_joint_bl_thread.start()
