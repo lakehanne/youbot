@@ -12,8 +12,6 @@ from gazebo_msgs.srv import ApplyJointEffort, ApplyJointEffortResponse,\
 from geometry_msgs.msg import Wrench
 from geometry_msgs.msg import Vector3
 
-
-logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
 LOGGER = logging.getLogger(__name__)
 
 def send_joint_torques(*msg):	
@@ -53,14 +51,14 @@ def clear_active_wrenches(body_name):
 	rospy.wait_for_service('/gazebo/clear_body_wrenches')
 	try:
 		clear_forces = rospy.ServiceProxy('/gazebo/clear_body_wrenches', BodyRequest)
-		rospy.loginfo('clearing wrenches on link: '.format(body_name))
-		resp = clear_forces(joint_name)
+		rospy.logdebug('clearing wrenches on link: '.format(body_name))
+		resp = clear_forces(body_name)
 
 		# return BodyRequestResponse(resp.success, resp.status_message)
 	except rospy.ServiceException, e:
 		rospy.loginfo("Service call failed: %s"%e)
 
-
+"""
 if __name__ == "__main__":
 
 	rospy.init_node('clients')
@@ -143,3 +141,4 @@ if __name__ == "__main__":
 	# wheel_joint_br_thread.start()
 	# wheel_joint_fl_thread.start()
 	# wheel_joint_fr_thread.start()
+"""

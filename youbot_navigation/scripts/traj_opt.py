@@ -15,9 +15,20 @@ import threading
 import numpy as np
 import scipy as sp
 
-from rospy.rostime import Duration
-from numpy.linalg import LinAlgError
+import rospkg
 from nav_msgs.msg import Odometry
+from rospy.rostime import Duration
+
+from geometry_msgs.msg import Wrench
+# from gazebo_msgs.srv import ApplyBodyWrench, ApplyBodyWrenchResponse, \
+#                             ApplyJointEffort, ApplyJointEffortResponse, \
+#                             JointRequest, BodyRequest
+
+# import torque and wrench services                            
+from scripts.services import send_joint_torques, clear_active_forces, \
+                             send_body_wrench, clear_active_wrenches
+
+from numpy.linalg import LinAlgError
 import scipy.ndimage as sp_ndimage
 from collections import namedtuple
 from scipy.integrate import odeint, RK45
@@ -26,16 +37,12 @@ from scripts.dynamics import Dynamics
 from scripts.sample import SampleList
 from scripts.algorithm_utils import TrajectoryInfo
 
-import rospkg
 from multiprocessing import Pool, Process
 
 import matplotlib as mpl
 mpl.use('QT4Agg')
 import matplotlib.pyplot as plt
 
-from gazebo_msgs.srv import ApplyJointEffort, ApplyJointEffortResponse,\
-                         ApplyBodyWrench, ApplyBodyWrenchResponse, \
-                         JointRequest, BodyRequest
 
 roslib.load_manifest('youbot_navigation')
 
@@ -63,7 +70,6 @@ print(args)
 
 class TrajectoryOptimization(Dynamics):
     """docstring for TrajectoryOptimization
-    rate = rate at which to call the ros engine for msgs
     """
     def __init__(self, arg, rate, hyperparams):
         super(TrajectoryOptimization, self).__init__(Dynamics(Odometry, rate=rate))
@@ -469,6 +475,8 @@ class TrajectoryOptimization(Dynamics):
         start_time = Duration(secs = 0, nsecs = 0) # start asap 
 
         rospy.loginfo("stepped into forward pass of algorithm")
+        
+        reference_frame = None #'empty/world/map'
         # update the states and controls 
         for t in range(T):
             # self.pool_derivatives.apply_async(self.get_action_cost_jacs, \
@@ -494,59 +502,78 @@ class TrajectoryOptimization(Dynamics):
             torques = self.traj_distr.delta_action[t,:]
             # send in this order: 'wheel_joint_bl', 'wheel_joint_br', 'wheel_joint_fl', 'wheel_joint_fr'
             # create four different asynchronous threads for each wheel
-            wheel_joint_bl_thread = threading.Thread(group=None, target=self.send_joint_torques, 
+            """
+            wheel_joint_bl_thread = threading.Thread(group=None, target=send_joint_torques, 
                                         name='wheel_joint_bl_thread', 
                                         args=(wheel_joint_bl, torques[0], start_time, duration))
-            wheel_joint_br_thread = threading.Thread(group=None, target=self.send_joint_torques, 
+            wheel_joint_br_thread = threading.Thread(group=None, target=send_joint_torques, 
                                         name='wheel_joint_br_thread', 
                                         args=(wheel_joint_br, torques[1], start_time, duration))
-            wheel_joint_fl_thread = threading.Thread(group=None, target=self.send_joint_torques, 
+            wheel_joint_fl_thread = threading.Thread(group=None, target=send_joint_torques, 
                                         name='wheel_joint_fl_thread', 
                                         args=(wheel_joint_fl, torques[2], start_time, duration))
-            wheel_joint_fr_thread = threading.Thread(group=None, target=self.send_joint_torques, 
+            wheel_joint_fr_thread = threading.Thread(group=None, target=send_joint_torques, 
                                         name='wheel_joint_fr_thread', 
                                         args=(wheel_joint_fr, torques[3], start_time, duration))
             
+            """
+            wrench_bl, wrench_br, wrench_fl, wrench_fr = Wrench(), Wrench(), Wrench(), Wrench()
+
+            wrench_bl.force.x = torques[0]
+            wrench_bl.force.y = torques[0]
+
+            wrench_br.force.x = torques[1]
+            wrench_br.force.y = torques[1]
+
+            wrench_fl.force.x = torques[2]
+            wrench_fl.force.y = torques[2]
+
+            wrench_fr.force.x = torques[3]
+            wrench_fr.force.y = torques[3]
+
+            resp_bl = send_body_wrench('wheel_link_bl', reference_frame, 
+                                            None, wrench_bl, start_time, 
+                                            duration )
+            resp_br = send_body_wrench('wheel_link_br', reference_frame, 
+                                            None, wrench_bl, start_time, 
+                                            duration )
+            resp_fl = send_body_wrench('wheel_link_fl', reference_frame, 
+                                            None, wrench_bl, start_time, 
+                                            duration )
+            resp_fr = send_body_wrench('wheel_link_fr', reference_frame, 
+                                            None, wrench_bl, start_time, 
+                                            duration )
             rospy.sleep(duration)
+
+            # clear active wrenches
+            clear_bl = clear_active_wrenches('wheel_link_bl')
+            clear_br = clear_active_wrenches('wheel_link_bl')
+            clear_fl = clear_active_wrenches('wheel_link_bl')
+            clear_fr = clear_active_wrenches('wheel_link_bl')
 
             if args.silent:
                 print('\n\n')
 
-            # https://docs.python.org/2/library/threading.html
-            wheel_joint_bl_thread.daemon = True
-            wheel_joint_br_thread.daemon = True
-            wheel_joint_fl_thread.daemon = True
-            wheel_joint_fr_thread.daemon = True
+            # # https://docs.python.org/2/library/threading.html
+            # wheel_joint_bl_thread.daemon = True
+            # wheel_joint_br_thread.daemon = True
+            # wheel_joint_fl_thread.daemon = True
+            # wheel_joint_fr_thread.daemon = True
 
-            # send torques to robot
-            wheel_joint_fl_thread.start()
-            wheel_joint_fr_thread.start() 
-            wheel_joint_bl_thread.start()
-            wheel_joint_br_thread.start()   
+            # # send torques to robot
+            # wheel_joint_fl_thread.start()
+            # wheel_joint_fr_thread.start() 
+            # wheel_joint_bl_thread.start()
+            # wheel_joint_br_thread.start()   
 
-            # if t < 5:
-                # timeout = t * 2
-            timeout=t
+            # # if t < 5:
+            #     # timeout = t * 2
+            # timeout=t
             """
             wait until last thread finishes before running the next time step
             this places the for loop in a blocking call
             """
-            # wheel_joint_fr_thread.join(timeout=timeout)  
-
-
-    def send_joint_torques(self, *msg):  
-
-        rospy.wait_for_service('/gazebo/apply_joint_effort')
-
-        try:
-            send_torque = rospy.ServiceProxy('/gazebo/apply_joint_effort', ApplyJointEffort)
-            rospy.logdebug('sending {}N to {}'.format(msg[1], msg[0]))
-            resp = send_torque(msg[0], msg[1], msg[2], msg[3])
-
-            return ApplyJointEffortResponse(resp.success, resp.status_message)
-        except rospy.ServiceException, e:
-            print("Service call failed: %s"%e)
-
+            # wheel_joint_fr_thread.join(timeout=timeout) 
 
 if __name__ == '__main__':
 
