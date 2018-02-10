@@ -24,14 +24,17 @@ config = dict(
 		'dV': 4,
 		'dX': 3, # includes velocity terms
 		'dO': 3,
+		'TOL': 1e-2, # tolerance for stopping DP algorithm
 		'alpha': 1.0,
 		'conditions': 4,
+		'sample_length': 30,  # number of samples used in cost-to-go function
 		'delta': 1e-4, # initial value of step size used in adjusting delta
         'mu': 1e-6, # init regularizer
         'mu_min': 1e-6, # regularization min
         'delta_nut': 2,  # for regularization schedule
 		'euler_step': 1e-2,  # step for the euler integrator
 		'euler_iter': 50,  # step for the euler integrator
+		'smooth_random_walk': True,
 	    'smooth_noise': True,
 	    'smooth_noise_var': 2.0,
 	    'smooth_noise_renormalize': True,
