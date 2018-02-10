@@ -11,6 +11,7 @@ from gazebo_msgs.srv import ApplyJointEffort, ApplyJointEffortResponse,\
 						 JointRequest, BodyRequest
 from geometry_msgs.msg import Wrench
 from geometry_msgs.msg import Vector3
+from geometry_msgs.msg import Twist
 
 LOGGER = logging.getLogger(__name__)
 

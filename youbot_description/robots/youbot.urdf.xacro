@@ -33,6 +33,8 @@
   <!-- kinect -->
   <xacro:include filename="$(find youbot_description)/urdf/sensors/kinect_camera.urdf.xacro"/>
 
+  <!-- obstacle -->
+<!--   <xacro:include filename="$(find youbot_description)/urdf/youbot_obstacle/obstacle.urdf.xacro" /> -->
   <!-- Now we can start using the macros xacro:included above to define the actual youbot -->
 
   <!-- The first use of a macro.  This one was defined in base.urdf.xacro above.
@@ -62,6 +64,8 @@
   <xacro:hokuyo_urg04_laser name="base_laser_front" parent="base" ros_topic="scan" update_rate="10" min_angle="-1.57" max_angle="1.57">
     <origin xyz="0.3 0 -0.03" rpy="0 0 0"/>
   </xacro:hokuyo_urg04_laser>
+
+  <!-- <xacro:youbot_obstacle_box_gazebo/> -->
 
   <!-- kinect camera front -->
 <!--   <xacro:kinect_camera name="kinect_camera" parent="arm_link_4">

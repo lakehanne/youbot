@@ -58,7 +58,6 @@ class Dynamics(MassMaker):
                       self.wheel['friction'], self.wheel['friction'],
                       self.wheel['friction'], self.wheel['friction']
                      ])
-        # f = np.expand_dims(f, axis=1)
         base_footprint_dim = 0.001  # retrieved from the box geom in gazebo
         l = np.sqrt(2* base_footprint_dim)
         l_sqr = 2* base_footprint_dim
@@ -66,9 +65,9 @@ class Dynamics(MassMaker):
         alpha = np.arctan2(b, a)
 
         x     = self.odom.pose.pose.position.x
-        y     = self.odom.pose.pose.position.y
+        y     = self.odom.pose.pose.position.y        
 
-        # note that i have switched the ordering of qx and qy due to the different conventions in ros and the paper
+        # note that i have switched the ordering of qx and qy due to the different conventions in gazebo and the paper
         quaternion = [self.odom.pose.pose.orientation.w, self.odom.pose.pose.orientation.y,
                         self.odom.pose.pose.orientation.x,self.odom.pose.pose.orientation.z]
         _, _, theta = euler_from_quaternion(quaternion, axes='sxyz')
@@ -78,12 +77,7 @@ class Dynamics(MassMaker):
         ydot = self.odom.twist.twist.linear.y
         theta_dot = self.odom.twist.twist.angular.z
 
-        # quaternion_dot = [1.0, self.odom.twist.twist.angular.y,
-                        # self.odom.twist.twist.angular.x, self.odom.twist.twist.angular.z]
-        # _, _, theta_dot = euler_from_quaternion(quaternion_dot, axes='sxyz')
-        # theta_dot -= np.pi/2.0  # account for diffs of frames in gazebo and paper  
-
-        d1, d2 = 1e-2, 1e-2 # not sure of this
+        d1, d2 = 0, 0 #1e-2, 1e-2 # not sure of this
 
         # define mass matrix elements
         m11 = mb + 4 * (mw + I/(r**2))
@@ -145,12 +139,18 @@ class Dynamics(MassMaker):
 
         Phi_right_mat[0,1] = np.sin(theta)
         Phi_right_mat[1,0] = -np.sin(theta)
+        Phi_right_mat[2,2] = 1
 
-        Phi_right_vector   = np.asarray([xdot, ydot, theta_dot]) #np.expand_dims(
-                                # np.asarray([xdot, ydot, theta_dot]),
-                                # axis=1)
+        Phi_right_vector   = np.asarray([xdot, ydot, theta_dot]) 
+
         # assemble Phi vector  --> will be 4 x 1
         Phi_dot = Phi_coeff * Phi_left_mat.dot(Phi_right_mat).dot(Phi_right_vector)
+        
+        # store away future variables dot
+        self.Phi_dot = Phi_dot
+        self.alpha   = alpha
+        self.l = l
+
         S = np.diag(np.sign(Phi_dot).squeeze())
 
         Dynamics = namedtuple('Dynamics', ['M', 'C', 'B', 'S', 'f', 'r', 'qaccel', 'qvel', 'q'], 

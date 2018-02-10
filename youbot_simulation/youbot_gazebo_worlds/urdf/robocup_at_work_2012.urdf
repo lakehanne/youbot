@@ -271,6 +271,7 @@
         iyy="${1e-2/12}" iyz="0.0000" 
         izz="${1e-2/12}"/>
     </inertial>
+
     <visual>
      <origin xyz="0 0 0" rpy="0 0 0" />
      <geometry>
@@ -279,10 +280,11 @@
      <material name="orange"/>
      <origin xyz="0 0 0" rpy="0 0 0" />
     </visual>    
+
     <collision>
        <origin xyz="0 0 0" rpy="0 0 0" />
        <geometry>        
-        <box size="${2*0.15748} ${2*0.15748} ${0.35*0.8508}}"  />
+        <box size="${2*0.15748} ${2*0.15748} ${0.35*0.8508}"  />
        </geometry>
     </collision>
   </link>
