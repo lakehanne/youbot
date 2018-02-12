@@ -209,12 +209,15 @@ class TrajectoryOptimization(Dynamics):
             # find z
             cost_change = (J_prev_traj - J_curr_traj)/cost_change_scale
 
-            # accept the iteration opnly if 0 < c1 < z
-            if cost_change < c and cost_change > 0: # accept the trajectory
+            rospy.loginfo('cost_change: {}, Jprev; {}, Jcur: {}'
+                .format(cost_change, J_prev_traj, J_curr_traj))
+
+            # accept the iteration only if 0 < c1 < z
+            if cost_change < c: # and cost_change > 0: # accept the trajectory
 
                 # ros com params
                 start_time = Duration(secs = 0, nsecs = 0) # start asap
-                duration = Duration(secs = 6, nsecs = 0) # apply effort continuously without end duration = -1
+                duration = Duration(secs = 2, nsecs = 0) # apply effort continuously without end duration = -1
                 reference_frame = None #'empty/world/map'
 
                 wrench_base = Wrench()
