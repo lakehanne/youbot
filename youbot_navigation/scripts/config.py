@@ -19,7 +19,7 @@ config = dict(
 		# 'goal_state': np.asarray([[-1.42604078657e-07, 7.64165118802e-08, des_theta,
 		# 	                                    0, 0, 0]]).T,
 		'goal_state': np.asarray([1.25000, 0.65000, 0]).T,
-		'T':  100,
+		'T':  20,
 		'dU': 4,
 		'dV': 4,
 		'dX': 3, # includes velocity terms

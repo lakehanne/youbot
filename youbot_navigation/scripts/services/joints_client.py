@@ -24,18 +24,18 @@ def send_joint_torques(*msg):
 
 		return ApplyJointEffortResponse(resp.success, resp.status_message)
 	except rospy.ServiceException, e:
-		print("Service call failed: %s"%e)
+		LOGGER.debug("Service call failed: %s"%e)
 
 def clear_active_forces(joint_name):	
 	rospy.wait_for_service('/gazebo/clear_joint_forces')
 	try:
 		clear_forces = rospy.ServiceProxy('/gazebo/clear_joint_forces', JointRequest)
-		rospy.loginfo('clearing forces on joint: '.format(joint))
+		LOGGER.debug('clearing forces on joint: '.format(joint))
 		resp = clear_forces(joint_name)
 
 		return JointRequestResponse(resp.success, resp.status_message)
 	except rospy.ServiceException, e:
-		rospy.loginfo("Service call failed: %s"%e)
+		LOGGER.debug("Service call failed: %s"%e)
 
 
 def send_body_wrench(*msg):	

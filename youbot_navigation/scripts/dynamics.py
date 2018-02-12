@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
+import os
+import imp
 import rospy
 import logging
 import numpy as np
@@ -9,22 +11,42 @@ from nav_msgs.msg import Odometry
 from collections import namedtuple
 
 from scripts.constants import MassMaker
+from scripts.algorithm_utils import TrajectoryInfo, \
+                            generate_noise, CostInfo
+
 from multiprocessing.pool import ThreadPool
 from geometry_msgs.msg import Twist, \
         Pose, PoseStamped, Quaternion
 from tf.transformations import euler_from_quaternion
 
+
+from scripts import __file__ as scripts_filepath
+scripts_filepath = os.path.abspath(scripts_filepath)
+scripts_dir = '/'.join(str.split(scripts_filepath, '/')[:-1]) + '/'
+hyperparams_file = scripts_dir + 'config.py'
+hyperparams = imp.load_source('hyperparams', hyperparams_file)
+config = hyperparams.config
+
 LOGGER = logging.getLogger(__name__)
 
 class Dynamics(MassMaker):
-    def __init__(self, Odometry, rate=10):
+    def __init__(self, rate):
         super(Dynamics, self).__init__()
-        self.rate = rate  # 10Hz
+        self.rate = 10  # 10Hz
 
         mat_maker = MassMaker()
         mat_maker.get_mass_matrices()
+        # print('config: ', config.keys())
+        # config                = hyperparams.config  
+        self.agent            = config['agent']      
+        self.T                = config['agent']['T']
+        self.dU               = config['agent']['dU']
+        self.dX               = config['agent']['dX']
+        self.goal_state       = config['agent']['goal_state']
 
         self.__dict__.update(mat_maker.__dict__)
+
+        num_samples = config['agent']['sample_length']
 
     def odom_cb(self, odom):
         self.odom = odom
@@ -159,3 +181,184 @@ class Dynamics(MassMaker):
 
         return body_dynamics
 
+    def expand_array(self, array, dim):
+        return np.expand_dims(array, axis=dim)
+
+
+    def get_samples(self, noisy=False):
+        """
+            Get N samples of states and controls from the robot
+        """
+
+        T   = self.T
+        dU  = self.dU
+        dX  = self.dX
+
+        traj_info =  TrajectoryInfo(config)
+        cost_info =  CostInfo(config)
+        
+        # see generalized ILQG Summary page
+        k = range(0, T)
+        K = len(k)
+        delta_t = T/(K-1)
+        t = [(_+1-1)*delta_t for _ in k]
+
+        # for n in range(N):
+
+        # allocate space for local controls
+        u       = np.zeros((T, dU))
+        x       = np.zeros((T, dX))
+
+        delta_u = np.zeros_like(u)
+        delta_x = np.zeros_like(x)
+
+        u_bar   = np.random.randint(0, 2, size=(T, dU))  #np.zeros_like(u) #  
+        # initialize u_bar
+        # u_bar[:,] = config['trajectory']['init_action']
+        x_bar   = np.zeros_like(x)
+
+        fx      = np.zeros((T, dX, dX))
+        fu      = np.zeros((T, dX, dU))
+
+        x_noise = generate_noise(T, dX, self.agent)
+
+        # costs
+        l        = np.zeros((T))
+        l_nom    = np.zeros((T))
+        lu       = np.zeros((T, dU))
+        lx       = np.zeros((T, dX))
+        lxx      = np.zeros((T, dX, dX))
+        luu      = np.zeros((T, dU, dU))
+        lux      = np.zeros((T, dU, dX))
+
+       # apply u_bar to deterministic system
+        for k in range(K-1):
+            # get body dynamics. Note that some of these are time varying parameters
+            body_dynamics = self.assemble_dynamics()
+
+            # time varying inverse dynamics parameters
+            M           = body_dynamics.M
+            C           = body_dynamics.C
+            B           = body_dynamics.B
+            S           = body_dynamics.S
+            qaccel      = body_dynamics.qaccel
+            qvel        = body_dynamics.qvel
+            q           = body_dynamics.q
+            f           = body_dynamics.f
+
+            # calculate the forward dynamics equation
+            Minv            = np.linalg.inv(M)
+            rhs             = - Minv.dot(C).dot(x_bar[k,:]) - Minv.dot(B.T).dot(S.dot(f)) \
+                              + Minv.dot(B.T).dot(u_bar[k, :])/self.wheel['radius']
+            # print('rhs: ', rhs, 'xbar: ')
+            if k == 0:
+                x_bar[k]    = delta_t * rhs
+            x_bar[k+1,:]    = x_bar[k,:] +  delta_t * rhs
+
+            # step 2.1: get linearized dynamics
+            BBT             = B.dot(B.T)
+            Inv_BBT         = np.linalg.inv(BBT)
+            lhs             = Inv_BBT.dot(self.wheel['radius'] * B)
+            
+            # step 2.2: set up nonlinear dynamics at k
+            u[k,:]          = lhs.dot(M.dot(qaccel) + C.dot(qvel) + \
+                                    B.T.dot(S).dot(f)).squeeze()
+
+            if noisy: # inject noise to the states
+                x[k,:]      = q + x_noise[k, :]
+            else:
+                x[k,:]      = q
+
+            rhs             = - Minv.dot(C).dot(x[k,:]) - Minv.dot(B.T).dot(S.dot(f)) \
+                                 + Minv.dot(B.T).dot(u[k,:])/self.wheel['radius']
+            x[k+1,:]        = x[k,:] +  delta_t * rhs
+
+            # # calculate the jacobians
+            fx[k,:,:]   = np.eye(self.dX) - delta_t * Minv.dot(C)
+            fu[k,:,:]   = -(delta_t * self.wheel['radius']) * Minv.dot(B.T) 
+
+            #step 2.3 set up state-action deviations
+            delta_x[k,:]     = x[k,:] - x_bar[k,:]
+            delta_u[k,:]     = u[k,:] - u_bar[k,:]
+            delta_x_star = self.goal_state
+
+
+            # calculate cost-to-go and derivatives of stage_cost
+            delu_exp = self.expand_array(delta_u[k,:], 1)
+            delx_exp = self.expand_array(delta_x[k,:]-delta_x_star, 1)
+            cost_action_term = 0.5 * self.action_penalty[0] * delu_exp.T.dot(delu_exp)
+            cost_state_term  = 0.5 * self.state_penalty[0]  * delx_exp.T.dot(delx_exp)
+            cost_l12_term    = np.sqrt(self.l21_const + self.expand_array((delta_x[k,:] \
+                                - delta_x_star), axis=1).T.dot(self.expand_array((delta_x[k,:] \
+                                - delta_x_star), axis=1))
+            # cost_l12_term    = np.sqrt(self.l21_const \+ (delta_x[k,:] - delta_x_star)**2)
+
+
+            # nominal cost terms
+            ubar_exp = self.expand_array(u_bar[k,:], 1)
+            xbar_exp = self.expand_array(x_bar[k,:] - delta_x_star, 1)
+            cost_nom_action_term = 0.5 * self.action_penalty[0] * ubar_exp.T.dot(ubar_exp)
+            cost_nom_state_term  = 0.5 * self.state_penalty[0] * xbar_exp.T.dot(xbar_exp)              
+            cost_nom_l12_term   = np.sqrt(self.l21_const + self.expand_array((x_bar[k,:] \
+                                    - delta_x_star), 1).T.dot(self.expand_array((x_bar[k,:] \
+                                    - delta_x_star), 1)) 
+            # cost_nom_l12_term    = np.sqrt(self.l21_const + self.expand_array((x_bar[k,:] - delta_x_star), 1).T.dot(self.expand_array((x_bar[k,:] - delta_x_star), 1))        
+
+            # define lx/lxx cost costants        
+            final_state_diff = (x[k,:] - self.goal_state)
+            sqrt_term        = np.sqrt(self.l21_const + self.expand_array(final_state_diff, 1).T.dot(self.expand_array(final_state_diff, 1)))
+
+            #system cost
+            l[k]       = cost_action_term + cost_state_term + cost_l12_term        
+            # nominal cost about linear traj
+            l_nom[k]   = cost_nom_action_term + cost_nom_state_term + cost_nom_l12_term
+
+            # I think we need to do this
+            l[k] += l_nom[k]
+
+            # print('delu_exp: {}, delx_exp: {}', lu[k].shape, delta_u[k,:].shape)
+            # first order cost terms
+            lu[k] = self.action_penalty[0] * delta_u[k,:]
+            lx[k] = self.state_penalty[0] * delx_exp.squeeze() \
+                    + (final_state_diff/np.sqrt(self.l21_const + final_state_diff**2)) 
+
+            # 2nd order cost terms
+            luu[k]     = np.diag(self.action_penalty)        
+            lux[k]     = np.zeros((self.dU, self.dX))
+
+            lxx_t1  = np.diag(self.state_penalty)
+            lxx_t2_top = sqrt_term - (final_state_diff**2) /sqrt_term
+            lxx_t2_bot = self.l21_const + (final_state_diff**2)
+
+            lxx[k]        = lxx_t1 + lxx_t2_top/lxx_t2_bot 
+            # lxx[k]     = np.diag(self.state_penalty)
+
+            # squeeze dims of first order derivatives
+            lx[k] = lx[k].squeeze() if lx[k].ndim > 1 else lx[k]            
+            lu[k] = lu[k].squeeze() if lu[k].ndim > 1 else lu[k] 
+ 
+
+            # store away stage terms
+            traj_info.fx[k,:]            = fx[k,:]
+            traj_info.fu[k,:]            = fu[k,:]
+            traj_info.action[k,:]        = u[k,:]
+            traj_info.state[k,:]         = x[k,:]
+            traj_info.delta_state[k,:]   = delta_x[k,:]
+            traj_info.delta_action[k,:]  = delta_u[k,:]
+            traj_info.nominal_state[k,:] = x_bar[k,:]
+            traj_info.nominal_action[k,:]= u_bar[k,:]
+
+            cost_info.l[k]   = l[k]
+            cost_info.lu[k]  = lu[k]
+            cost_info.lx[k]  = lx[k]
+            cost_info.lux[k] = lux[k]
+            cost_info.luu[k] = luu[k]
+            cost_info.lxx[k] = lxx[k]
+            cost_info.l_nom[k]   = l_nom[k]
+
+        sample = {'traj_info': traj_info, 'cost_info': cost_info}
+
+        return sample
+
+
+        
