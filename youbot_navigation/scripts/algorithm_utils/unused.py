@@ -1,94 +1,278 @@
-    def get_traj_cost_info(self, noisy=False):
+           """
+            # change in cost
+            eps = 1
+            temp_sum = 0
+            for i in range(T-1):
+                temp_sum += new_sample_info.cost_info.lu[i].T.dot(np.linalg.inv(new_sample_info.cost_info.Quu_tilde[i])).dot(\
+                new_sample_info.cost_info.lu[i])
+            temp_sum = temp_sum + 
 
-        T, dU, dX = self.T, self.dU, self.dX
+            anut = -eps * (1 - eps/2) * temp_sum
+            delta_Vnut = np.sum(new_sample_info.cost_info.l_nlnr[:-2] \
+                                - new_sample_info.cost_info.l_nom[:-2],
+                                    axis=0) \
+                            + new_sample_info.cost_info.l_nlnr[-1] \
+                            - new_sample_info.cost_info.l_nom[-1] 
+            reduce_term = delta_Vnut / abs(eps * (1 - eps/2) * anut)
 
-        N = self.config['agent']['sample_length']
+            if delta_Vnut > 0 or reduce_term < c:
+                eps = eps/2
 
-        # allocate 
-        fx      = np.zeros((N, T, dX, dX))
-        fu      = np.zeros((N, T, dX, dU))
-        fuu     = np.zeros((T, dU, dU))
-        fux     = np.zeros((T, dU, dX))
+                # restart backward and forward passes
+                rospy.loginfo("change in cost is %.4f; restarting DP algorithm"%delta_Vnut)
+                prev_sample_info = self.backward(sample_info, noisy)
+                new_sample_info  = self.forward(prev_sample_info, noisy)
+            elif delta_Vnut < 0 and reduce_term > c:
+                # implement the control law on the robot
+                rospy.loginfo("change in cost %.4f is acceptable. implementing it on the robot"%delta_Vnut)
+            """
+                # ros com params
+                start_time = Duration(secs = 0, nsecs = 0) # start asap
+                duration = Duration(secs = 0.01, nsecs = 0) # apply effort continuously without end duration = -1
+                reference_frame = None #'empty/world/map'
 
-        u       = np.zeros((N, T, dU))
-        x       = np.zeros((N, T, dX))
+                wrench_base = Wrench()
+                base_angle = Twist()
 
-        # change in state-action pair
-        delta_u = np.zeros_like(u)
-        delta_x = np.zeros_like(x)
+                rospy.loginfo("Found suitable trajectory. Applying found control law")
 
-        # nominal state-action pair
-        u_bar   = np.zeros_like(u)
-        x_bar   = np.zeros_like(x)
+                for t in range(T):
+                    # send the computed torques to ROS
+                    torques = new_sample_info.traj_info.action[t,:]
 
-        # costs
-        l        = np.zeros((N, T))
-        l_nom    = np.zeros((N, T))
-        lu       = np.zeros((N, T, dU))
-        lx       = np.zeros((N, T, dX))
-        lxx      = np.zeros((N, T, dX, dX))
-        luu      = np.zeros((N, T, dU, dU))
-        lux      = np.zeros((N, T, dU, dX))
+                    # calculate the genralized force and torques
+                    bdyn = self.assemble_dynamics()
+                    theta = bdyn.q[-1]
 
-        # get real samples from the robot
-        for n in range(N):
+                    sign_phi = np.sign(self.Phi_dot)
+                    F1 = (torques[0] - self.wheel['radius'] * sign_phi[0] * bdyn.f[0]) * \
+                            (-(np.cos(theta) - np.sin(theta))/self.wheel['radius']) + \
+                         (torques[1] - self.wheel['radius'] * sign_phi[1] * bdyn.f[0]) * \
+                            (-(np.cos(theta) + np.sin(theta))/self.wheel['radius'])  + \
+                         (torques[2] - self.wheel['radius'] * sign_phi[2] * bdyn.f[0]) * \
+                            ((np.cos(theta) - np.sin(theta))/self.wheel['radius'])  + \
+                         (torques[3] - self.wheel['radius'] * sign_phi[3] * bdyn.f[0]) * \
+                            ((np.cos(theta) + np.sin(theta))/self.wheel['radius'])
+                    F2 = (torques[0] - self.wheel['radius'] * sign_phi[0] * bdyn.f[0]) * \
+                            (-(np.cos(theta) + np.sin(theta))/self.wheel['radius']) + \
+                         (torques[1] - self.wheel['radius'] * sign_phi[1] * bdyn.f[0]) * \
+                            (-(-np.cos(theta) + np.sin(theta))/self.wheel['radius'])  + \
+                         (torques[2] - self.wheel['radius'] * sign_phi[2] * bdyn.f[0]) * \
+                            ((np.cos(theta) + np.sin(theta))/self.wheel['radius'])  + \
+                         (torques[3] - self.wheel['radius'] * sign_phi[3] * bdyn.f[0]) * \
+                            ((-np.cos(theta) + np.sin(theta))/self.wheel['radius'])
+                    F3 = np.sum(torques) * (-np.sqrt(2)*self.l * np.sin( np.pi/4 - self.alpha)/self.wheel['radius'])  \
+                           + (sign_phi[0] * bdyn.f[0] + sign_phi[1] * bdyn.f[0] + sign_phi[2] * bdyn.f[0] + sign_phi[3] * bdyn.f[0]) \
+                                * (np.sqrt(2)* self.l * np.sin(np.pi/4 - self.alpha))
 
-            sample = self.get_samples(noisy)
+                    rospy.loginfo('F1: {}, F2: {}, F3: {}'.format(F1, F2, F3))
+                    wrench_base.force.x = F1
+                    wrench_base.force.y = F2
+                    base_angle.angular.z = F3
 
-            traj_info = sample['traj_info']
+                    # send the torques to the base footprint
+                    # self.pub.publish(base_angle)
+                    send_body_wrench('base_footprint', reference_frame,
+                                                    None, wrench_base, start_time,
+                                                    duration )
 
-            # get the derivatives of f
-            fx[n]         = traj_info.fx
-            fu[n]         = traj_info.fu
+                    rospy.sleep(duration)
 
-            u[n]          = traj_info.action
-            x[n]          = traj_info.state
+                    clear_active_wrenches('base_footprint')
 
-            delta_u[n]    = traj_info.delta_action
-            delta_x[n]    = traj_info.delta_state
-            x_bar[n]      = traj_info.nominal_state
-            u_bar[n]      = traj_info.nominal_action
+                # set ubar_i = u_i, xbar_i = x_i and repeat traj_opt # step 5 DDP book
+                new_sample_info.traj_info.nominal_action = new_sample_info.traj_info.action
+                new_sample_info.traj_info.nominal_state  = new_sample_info.traj_info.state
 
-            cost_info = sample['cost_info']
-            # now calculate the cost-to-go around each sample
-            
-            l[n]    = cost_info.l
-            l_nom[n]= cost_info.l_nom
-            lx[n]   = cost_info.lx
-            lu[n]   = cost_info.lu                
-            lxx[n]  = cost_info.lxx
-            luu[n]  = cost_info.luu
-            lux[n]  = cost_info.lux
+                # calculate anut(xnut_bar)
+                anut_xnut_bar = -eps * (1 - eps/2) * \
+                        new_sample_info.cost_info.lu[0].T.dot(\
+                        np.linalg.inv(new_sample_info.cost_info.Quu_tilde[0])).dot(\
+                        new_sample_info.cost_info.lu[0])
 
-        cost_info = CostInfo(self.config)
-        traj_info = TrajectoryInfo(self.config)
+                if abs(anut_xnut_bar) <= stop_cond:
+                    print('met stopping criteria')
+                    break
 
-        # fill in the cost estimate
-        cost_info.l     = np.mean(l, 0)
-        cost_info.l_nom = np.mean(l_nom, 0)
-        cost_info.lu    = np.mean(lu, 0)
-        cost_info.lx    = np.mean(lx, 0)
-        cost_info.lxx   = np.mean(lxx, 0)
-        cost_info.luu   = np.mean(luu, 0)
-        cost_info.lux   = np.mean(lux, 0)
+def get_traj_cost_info(self, noisy=False):
 
-        # store away stage trajectories
-        traj_info.fx            = np.mean(fx,    axis=0)
-        traj_info.fu            = np.mean(fu,    axis=0)
-        traj_info.action        = np.mean(u,     axis=0)
-        traj_info.state         = np.mean(x,     axis=0)
-        traj_info.delta_state   = np.mean(delta_x, axis=0)
-        traj_info.delta_action  = np.mean(delta_u, axis=0)
-        traj_info.nominal_state = np.mean(x_bar,   axis=0)
+    T, dU, dX = self.T, self.dU, self.dX
 
+    N = self.config['agent']['sample_length']
+
+    # allocate 
+    fx      = np.zeros((N, T, dX, dX))
+    fu      = np.zeros((N, T, dX, dU))
+    fuu     = np.zeros((T, dU, dU))
+    fux     = np.zeros((T, dU, dX))
+
+    u       = np.zeros((N, T, dU))
+    x       = np.zeros((N, T, dX))
+
+    # change in state-action pair
+    delta_u = np.zeros_like(u)
+    delta_x = np.zeros_like(x)
+
+    # nominal state-action pair
+    u_bar   = np.zeros_like(u)
+    x_bar   = np.zeros_like(x)
+
+    # costs
+    l        = np.zeros((N, T))
+    l_nom    = np.zeros((N, T))
+    lu       = np.zeros((N, T, dU))
+    lx       = np.zeros((N, T, dX))
+    lxx      = np.zeros((N, T, dX, dX))
+    luu      = np.zeros((N, T, dU, dU))
+    lux      = np.zeros((N, T, dU, dX))
+
+    # get real samples from the robot
+    for n in range(N):
+
+        sample = self.get_samples(noisy)
+
+        traj_info = sample['traj_info']
+
+        # get the derivatives of f
+        fx[n]         = traj_info.fx
+        fu[n]         = traj_info.fu
+
+        u[n]          = traj_info.action
+        x[n]          = traj_info.state
+
+        delta_u[n]    = traj_info.delta_action
+        delta_x[n]    = traj_info.delta_state
+        x_bar[n]      = traj_info.nominal_state
+        u_bar[n]      = traj_info.nominal_action
+
+        cost_info = sample['cost_info']
+        # now calculate the cost-to-go around each sample
         
+        l[n]    = cost_info.l
+        l_nom[n]= cost_info.l_nom
+        lx[n]   = cost_info.lx
+        lu[n]   = cost_info.lu                
+        lxx[n]  = cost_info.lxx
+        luu[n]  = cost_info.luu
+        lux[n]  = cost_info.lux
 
-        # joint names of the four wheels
-        wheel_joint_bl = 'wheel_joint_bl'
-        wheel_joint_br = 'wheel_joint_br'
-        wheel_joint_fl = 'wheel_joint_fl'
-        wheel_joint_fr = 'wheel_joint_fr'
-             # send in this order: 'wheel_joint_bl', 'wheel_joint_br', 'wheel_joint_fl', 'wheel_joint_fr'
+    cost_info = CostInfo(self.config)
+    traj_info = TrajectoryInfo(self.config)
+
+    # fill in the cost estimate
+    cost_info.l     = np.mean(l, 0)
+    cost_info.l_nom = np.mean(l_nom, 0)
+    cost_info.lu    = np.mean(lu, 0)
+    cost_info.lx    = np.mean(lx, 0)
+    cost_info.lxx   = np.mean(lxx, 0)
+    cost_info.luu   = np.mean(luu, 0)
+    cost_info.lux   = np.mean(lux, 0)
+
+    # store away stage trajectories
+    traj_info.fx            = np.mean(fx,    axis=0)
+    traj_info.fu            = np.mean(fu,    axis=0)
+    traj_info.action        = np.mean(u,     axis=0)
+    traj_info.state         = np.mean(x,     axis=0)
+    traj_info.delta_state   = np.mean(delta_x, axis=0)
+    traj_info.delta_action  = np.mean(delta_u, axis=0)
+    traj_info.nominal_state = np.mean(x_bar,   axis=0)
+
+    
+
+    # joint names of the four wheels
+    wheel_joint_bl = 'wheel_joint_bl'
+    wheel_joint_br = 'wheel_joint_br'
+    wheel_joint_fl = 'wheel_joint_fl'
+    wheel_joint_fr = 'wheel_joint_fr'
+
+
+"""
+# this was extracted joints_client.py
+if __name__ == "__main__":
+
+    rospy.init_node('clients')
+
+    joint_name = 'youbot::arm_joint_1'
+    effort = 30.0
+    start_time = Duration(secs = 0, nsecs = 0) # start asap 
+    duration = Duration(secs = 5, nsecs = 0) # apply effort continuously without end duration = -1
+    
+    # response = send_joint_torques(joint_name, effort, start_time, duration)
+    # response = send_joint_torques('wheel_joint_br', effort, start_time, duration)
+    # response = send_joint_torques('wheel_joint_fl', effort, start_time, duration)
+    # response = send_joint_torques('wheel_joint_fr', effort, start_time, duration)
+    # LOGGER.debug('response: ', response)
+
+    # ['body_name', 'reference_frame', 'reference_point', 'wrench', 'start_time', 'duration']
+    wrench = Wrench()
+
+    wrench.force.x = 40
+    wrench.force.y = 40
+    wrench.force.z = 40
+
+    wrench.torque.x = 0
+    wrench.torque.y = 0
+    wrench.torque.y = 0
+
+    reference_frame = None #'empty/world/map'
+
+    resp_wrench = send_body_wrench('youbot::arm_link_2', reference_frame, 
+                                    None, wrench, start_time, 
+                                    duration )
+    resp_wrench = send_body_wrench('wheel_link_bl', reference_frame, 
+                                    None, wrench, start_time, 
+                                    duration )
+    resp_wrench = send_body_wrench('wheel_link_br', reference_frame, 
+                                    None, wrench, start_time, 
+                                    duration )
+    resp_wrench = send_body_wrench('wheel_link_fl', reference_frame, 
+                                    None, wrench, start_time, 
+                                    duration )
+    resp_wrench = send_body_wrench('wheel_link_fr', reference_frame, 
+                                    None, wrench, start_time, 
+                                    duration )
+
+    clear_bl = clear_active_wrenches('wheel_link_bl')
+    clear_br = clear_active_wrenches('wheel_link_bl')
+    clear_fl = clear_active_wrenches('wheel_link_bl')
+    clear_fr = clear_active_wrenches('wheel_link_bl')
+
+    print(resp_wrench)
+    
+    # send multiple torques to four wheels
+    # # right wheel
+    # wheel_joint_bl = 'wheel_joint_bl'
+    # wheel_joint_br = 'wheel_joint_br'
+    # wheel_joint_fl = 'wheel_joint_fl'
+    # wheel_joint_fr = 'wheel_joint_fr'
+
+    # # create four different asynchronous threads for each wheel
+    # wheel_joint_bl_thread = threading.Thread(group=None, target=send_joint_torques, 
+    #                           name='wheel_joint_bl_thread', 
+    #                           args=(wheel_joint_bl, effort, start_time, duration))
+    # wheel_joint_br_thread = threading.Thread(group=None, target=send_joint_torques, 
+    #                           name='wheel_joint_br_thread', 
+    #                           args=(wheel_joint_br, effort, start_time, duration))
+    # wheel_joint_fl_thread = threading.Thread(group=None, target=send_joint_torques, 
+    #                           name='wheel_joint_fl_thread', 
+    #                           args=(wheel_joint_fl, effort, start_time, duration))
+    # wheel_joint_fr_thread = threading.Thread(group=None, target=send_joint_torques, 
+    #                           name='wheel_joint_fr_thread', 
+    #                           args=(wheel_joint_fr, effort, start_time, duration))
+
+    # # https://docs.python.org/2/library/threading.html
+    # wheel_joint_bl_thread.daemon = True
+    # wheel_joint_br_thread.daemon = True
+    # wheel_joint_fl_thread.daemon = True
+    # wheel_joint_fr_thread.daemon = True
+
+    # wheel_joint_bl_thread.start()
+    # wheel_joint_br_thread.start()
+    # wheel_joint_fl_thread.start()
+    # wheel_joint_fr_thread.start()
+"""
+
+     # send in this order: 'wheel_joint_bl', 'wheel_joint_br', 'wheel_joint_fl', 'wheel_joint_fr'
     def get_new_state(self, theta, t):
         body_dynamics = self.assemble_dynamics()
 

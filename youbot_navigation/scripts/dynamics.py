@@ -90,8 +90,9 @@ class Dynamics(MassMaker):
         y     = self.odom.pose.pose.position.y
 
         # note that i have switched the ordering of qx and qy due to the different conventions in gazebo and the paper
-        quaternion = [self.odom.pose.pose.orientation.w, self.odom.pose.pose.orientation.y,
-                        self.odom.pose.pose.orientation.x,self.odom.pose.pose.orientation.z]
+        # the above comment has been confirmed in simulation to be wrong and this is heretofore fixed
+        quaternion = [self.odom.pose.pose.orientation.w, self.odom.pose.pose.orientation.x,
+                        self.odom.pose.pose.orientation.y,self.odom.pose.pose.orientation.z]
         _, _, theta = euler_from_quaternion(quaternion, axes='sxyz')
         # theta -= np.pi/2.0  # account for diffs of frames in gazebo and paper
 
@@ -99,7 +100,7 @@ class Dynamics(MassMaker):
         ydot = self.odom.twist.twist.linear.y
         theta_dot = self.odom.twist.twist.angular.z
 
-        d1, d2 = 0, 0 #1e-2, 1e-2 # not sure of this
+        d1, d2 = 1e-2, 1e-2 # not sure of this
 
         # define mass matrix elements
         m11 = mb + 4 * (mw + I/(r**2))
@@ -212,7 +213,7 @@ class Dynamics(MassMaker):
         delta_u = np.zeros_like(u)
         delta_x = np.zeros_like(x)
 
-        u_bar   = np.random.randint(0, 2, size=(T, dU))  #np.zeros_like(u) #
+        u_bar   = np.random.randint(low=0, high=2, size=(T, dU))  #np.zeros_like(u) #
         # initialize u_bar
         # u_bar[:,] = config['trajectory']['init_action']
         x_bar   = np.zeros_like(x)
@@ -225,6 +226,7 @@ class Dynamics(MassMaker):
         # costs
         l        = np.zeros((T))
         l_nom    = np.zeros((T))
+        l_nlnr   = np.zeros((T))
         lu       = np.zeros((T, dU))
         lx       = np.zeros((T, dX))
         lxx      = np.zeros((T, dX, dX))
@@ -263,11 +265,8 @@ class Dynamics(MassMaker):
             u[k,:]          = lhs.dot(M.dot(qaccel) + C.dot(qvel) + \
                                     B.T.dot(S).dot(f)).squeeze()
 
-            if noisy: # inject noise to the states
-                x[k,:]      = q + x_noise[k, :]
-            else:
-                x[k,:]      = q
-
+            # inject noise to the states
+            x[k,:]          = q + x_noise[k, :] if noisy else q
             rhs             = - Minv.dot(C).dot(x[k,:]) - Minv.dot(B.T).dot(S.dot(f)) \
                                  + Minv.dot(B.T).dot(u[k,:])/self.wheel['radius']
 
@@ -275,7 +274,7 @@ class Dynamics(MassMaker):
                 x_bar[k+1,:]    = x_bar[k,:] +  delta_t * rhs
                 x[k+1,:]        = x[k,:] +  delta_t * rhs
 
-            # # calculate the jacobians
+            # calculate the jacobians
             fx[k,:,:]   = np.eye(self.dX) - delta_t * Minv.dot(C)
             fu[k,:,:]   = -(delta_t * self.wheel['radius']) * Minv.dot(B.T)
 
@@ -284,15 +283,21 @@ class Dynamics(MassMaker):
             delta_u[k,:]     = u[k,:] - u_bar[k,:]
             delta_x_star = self.goal_state
 
+            # calculate cost-to-go and derivatives of nlnr stage_cost
+            u_exp = self.expand_array(u[k,:], 1)
+            x_exp = self.expand_array(x[k,:]-delta_x_star, 1)            
+            cost_action_nlnr_term = 0.5 * self.action_penalty[0] * u_exp.T.dot(u_exp)
+            cost_state_nlnr_term  = 0.5 * self.state_penalty[0]  * x_exp.T.dot(x_exp)
+            # print('x_exp: ', x_exp.shape)
+            cost_l12_nlnr_term    = np.sqrt(self.l21_const + (x_exp - delta_x_star).T.dot(x_exp - delta_x_star))
 
             # calculate cost-to-go and derivatives of stage_cost
             delu_exp = self.expand_array(delta_u[k,:], 1)
             delx_exp = self.expand_array(delta_x[k,:]-delta_x_star, 1)
             cost_action_term = 0.5 * self.action_penalty[0] * delu_exp.T.dot(delu_exp)
             cost_state_term  = 0.5 * self.state_penalty[0]  * delx_exp.T.dot(delx_exp)
-            cost_l12_term    = np.sqrt(self.l21_const + self.expand_array((delta_x[k,:] \
-                                - delta_x_star), 1).T.dot(self.expand_array((delta_x[k,:] \
-                                - delta_x_star), 1)))
+            cost_l12_term    = np.sqrt(self.l21_const + (delx_exp - delta_x_star).T.dot(\
+                                delx_exp - delta_x_star))
             # cost_l12_term    = np.sqrt(self.l21_const \+ (delta_x[k,:] - delta_x_star)**2)
 
 
@@ -301,22 +306,28 @@ class Dynamics(MassMaker):
             xbar_exp = self.expand_array(x_bar[k,:] - delta_x_star, 1)
             cost_nom_action_term = 0.5 * self.action_penalty[0] * ubar_exp.T.dot(ubar_exp)
             cost_nom_state_term  = 0.5 * self.state_penalty[0] * xbar_exp.T.dot(xbar_exp)
-            cost_nom_l12_term   = np.sqrt(self.l21_const + self.expand_array((x_bar[k,:] \
-                                    - delta_x_star), 1).T.dot(self.expand_array((x_bar[k,:] \
-                                    - delta_x_star), 1)))
+            cost_nom_l12_term   = np.sqrt(self.l21_const + (xbar_exp \
+                                    - delta_x_star).T.dot(xbar_exp \
+                                    - delta_x_star))
             # cost_nom_l12_term    = np.sqrt(self.l21_const + self.expand_array((x_bar[k,:] - delta_x_star), 1).T.dot(self.expand_array((x_bar[k,:] - delta_x_star), 1))
 
             # define lx/lxx cost costants
             final_state_diff = (x[k,:] - self.goal_state)
             sqrt_term        = np.sqrt(self.l21_const + self.expand_array(final_state_diff, 1).T.dot(self.expand_array(final_state_diff, 1)))
 
+            # print('cost_action_nlnr_term: {} cost_state_nlnr_term: {} cost_l12_nlnr_term'.format(\
+            #         cost_action_term, cost_state_term, cost_l12_term))
+            # print(l_nlnr[k])
+            # nlnr cost
+            l_nlnr[k]  = cost_action_nlnr_term[0][0] + cost_state_nlnr_term[0][0] + cost_l12_nlnr_term[0][0]
+            # print(l_nlnr[k])
             #system cost
-            l[k]       = cost_action_term + cost_state_term + cost_l12_term
+            l[k]       = cost_action_term[0][0] + cost_state_term[0][0] + cost_l12_term[0][0]
             # nominal cost about linear traj
-            l_nom[k]   = cost_nom_action_term + cost_nom_state_term + cost_nom_l12_term
+            l_nom[k]   = cost_nom_action_term[0][0] + cost_nom_state_term[0][0] + cost_nom_l12_term[0][0]
 
             # I think we need to do this
-            l[k] += l_nom[k]
+            # l[k] += l_nom[k]
 
             # print('delu_exp: {}, delx_exp: {}', lu[k].shape, delta_u[k,:].shape)
             # first order cost terms
@@ -339,7 +350,6 @@ class Dynamics(MassMaker):
             lx[k] = lx[k].squeeze() if lx[k].ndim > 1 else lx[k]
             lu[k] = lu[k].squeeze() if lu[k].ndim > 1 else lu[k]
 
-
             # store away stage terms
             traj_info.fx[k,:]            = fx[k,:]
             traj_info.fu[k,:]            = fu[k,:]
@@ -357,6 +367,7 @@ class Dynamics(MassMaker):
             cost_info.luu[k] = luu[k]
             cost_info.lxx[k] = lxx[k]
             cost_info.l_nom[k]   = l_nom[k]
+            cost_info.l_nlnr[k]  = l_nlnr[k]
 
         sample = {'traj_info': traj_info, 'cost_info': cost_info}
 

@@ -71,6 +71,7 @@ class CostInfo(BundleType):
         variables   = {
                         'l':                np.zeros((T)),
                         'l_nom':            np.zeros((T)),
+                        'l_nlnr':           np.zeros((T)),
                         'lx':               np.zeros((T, dX)),
                         'lu':               np.zeros((T, dU)),
                         'lux':              np.zeros((T, dU, dX)),
