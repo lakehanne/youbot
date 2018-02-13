@@ -47,6 +47,7 @@ config = dict(
 								7.821391440870244]),
 		'stopping_condition': 1e-1, # condition at which we stop the algorithm
 		'stopping_eta': 1e3, # initial eta
+		'c_zero': 1e-6, # zero term for c DP restart procedure
 		'duration_length': 3,  # amount of time to apply control law
 	},
 

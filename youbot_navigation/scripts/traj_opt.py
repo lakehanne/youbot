@@ -165,7 +165,7 @@ class TrajectoryOptimization(Dynamics):
         duration_length = self.config['trajectory']['duration_length']
 
         traj_samples = [] #use this to store traj info
-        
+        c_zero = self.config['trajectory']['c_zero']
         while eta > stop_cond:
             prev_sample_info = self.backward(sample_info, noisy)
 
@@ -225,7 +225,7 @@ class TrajectoryOptimization(Dynamics):
             traj_samples[:-2] = [] if len(traj_samples) > 10 else traj_samples
             
             c = 0.5  # see DDP pg 113
-            if cost_change > c and cost_change > 1e-6: # accept the trajectory
+            if cost_change > c and cost_change > c_zero: # accept the trajectory
 
                 # ros com params
                 start_time = Duration(secs = 0, nsecs = 0) # start asap

@@ -213,7 +213,7 @@ class Dynamics(MassMaker):
         delta_u = np.zeros_like(u)
         delta_x = np.zeros_like(x)
 
-        u_bar   = np.random.randint(low=0, high=2, size=(T, dU))  #np.zeros_like(u) #
+        u_bar   = np.random.randint(low=1, high=10, size=(T, dU))  #np.zeros_like(u) #
         # initialize u_bar
         # u_bar[:,] = config['trajectory']['init_action']
         x_bar   = np.zeros_like(x)
@@ -315,10 +315,6 @@ class Dynamics(MassMaker):
             final_state_diff = (x[k,:] - self.goal_state)
             sqrt_term        = np.sqrt(self.l21_const + self.expand_array(final_state_diff, 1).T.dot(self.expand_array(final_state_diff, 1)))
 
-            # print('cost_action_nlnr_term: {} cost_state_nlnr_term: {} cost_l12_nlnr_term'.format(\
-            #         cost_action_term, cost_state_term, cost_l12_term))
-            # print(l_nlnr[k])
-            # nlnr cost
             l_nlnr[k]  = cost_action_nlnr_term[0][0] + cost_state_nlnr_term[0][0] + cost_l12_nlnr_term[0][0]
             # print(l_nlnr[k])
             #system cost
