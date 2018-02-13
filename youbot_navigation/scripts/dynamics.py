@@ -36,8 +36,7 @@ class Dynamics(MassMaker):
 
         mat_maker = MassMaker()
         mat_maker.get_mass_matrices()
-        # print('config: ', config.keys())
-        # config                = hyperparams.config
+
         self.agent            = config['agent']
         self.T                = config['agent']['T']
         self.dU               = config['agent']['dU']
@@ -45,7 +44,6 @@ class Dynamics(MassMaker):
         self.goal_state       = config['agent']['goal_state']
 
         self.__dict__.update(mat_maker.__dict__)
-
         num_samples = config['agent']['sample_length']
 
     def odom_cb(self, odom):
@@ -68,20 +66,22 @@ class Dynamics(MassMaker):
         mb  = self.base['mass']
         mw  = self.wheel['mass']
         r   = self.wheel['radius']
+
         """
         I_b is the moment of inertia of the platform about Zr' axis thru G'
         I is the mom of inertia of ith wheel about main axis
         """
+
         I_b = self.base['mass_inertia'][-1,-1]
-        I = self.wheel['mass_inertia'][1,1]
+        I   = self.wheel['mass_inertia'][1,1]
 
         # f_i are the frictional force of each of the four wheels
-        f = np.array([
+        f   = np.array([
                       self.wheel['friction'], self.wheel['friction'],
                       self.wheel['friction'], self.wheel['friction']
                      ])
         base_footprint_dim = 0.001  # retrieved from the box geom in gazebo
-        l = np.sqrt(2* base_footprint_dim)
+        l   = np.sqrt(2* base_footprint_dim)
         l_sqr = 2* base_footprint_dim
         b, a = 0.19, 0.145 # meters as measured from the real robot
         alpha = np.arctan2(b, a)
@@ -127,7 +127,7 @@ class Dynamics(MassMaker):
         B[1,1] = B[2,0]
         B[3,1] = B[0,0]
 
-        xaccel= xdot/time_delta
+        xaccel = xdot/time_delta
         yaccel = ydot/time_delta
         theta_accel = theta_dot/time_delta
 

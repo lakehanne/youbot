@@ -19,7 +19,7 @@ config = dict(
 		# 'goal_state': np.asarray([[-1.42604078657e-07, 7.64165118802e-08, des_theta,
 		# 	                                    0, 0, 0]]).T,
 		'goal_state': np.asarray([1.25000, 0.65000, 0]).T,
-		'T':  5,
+		'T':  100,
 		'dU': 4,
 		'dV': 4,
 		'dX': 3, # includes velocity terms
@@ -41,9 +41,13 @@ config = dict(
 	},
 
 	trajectory = {
-		'init_action': np.array([9.891485822039117, 10.830327455656795, 8.995303183020859, 7.821391440870244]),
+		'init_action': np.array([9.891485822039117, 
+								10.830327455656795, 
+								8.995303183020859, 
+								7.821391440870244]),
 		'stopping_condition': 1e-1, # condition at which we stop the algorithm
 		'stopping_eta': 1e3, # initial eta
+		'duration_length': 3,  # amount of time to apply control law
 	},
 
 	linearized_params = {
@@ -61,13 +65,3 @@ config = dict(
 	          ],
 		}
 )
-
-    # position:
-    #   x: -1.42604078657e-07
-    #   y: 7.64165118802e-08
-    #   z: 0.150000000174
-    # orientation:
-    #   x: -4.09248993761e-11
-    #   y: 2.78940370874e-11
-    #   z: -2.1263232087e-07
-    #   w: 1.0

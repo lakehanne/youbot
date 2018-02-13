@@ -162,6 +162,7 @@ class TrajectoryOptimization(Dynamics):
         T = self.T
         stop_cond = self.config['trajectory']['stopping_condition']
         eta       = self.config['trajectory']['stopping_eta']
+        duration_length = self.config['trajectory']['duration_length']
 
         traj_samples = [] #use this to store traj info
         
@@ -173,12 +174,12 @@ class TrajectoryOptimization(Dynamics):
             #################################################################
             # check if integration of state diverged from previous iteration
             # see synthesis paper section D
-
+            #################################################################
             if len(traj_samples) > 1:
-                prev_sample_info = traj_samples[-2]
-                gu_expand = np.expand_dims(prev_sample_info.traj_info.gu, 2)
-                Qu_expand = np.expand_dims(prev_sample_info.cost_info.Qu, 2)
-                Quu       = prev_sample_info.cost_info.Quu
+                prev_traj = traj_samples[-2]
+                gu_expand = np.expand_dims(prev_traj.traj_info.gu, 2)
+                Qu_expand = np.expand_dims(prev_traj.cost_info.Qu, 2)
+                Quu       = prev_traj.cost_info.Quu
 
                 J_t1, J_t2 = 0, 0
                 for i in range(T-1):
@@ -186,10 +187,12 @@ class TrajectoryOptimization(Dynamics):
                     J_t2 += gu_expand[i,:,:].T.dot(Quu[i,:,:]).dot(gu_expand[i,:,:])
 
                 # cause I added l and l_nom
-                J_prev_traj = np.sum(prev_sample_info.cost_info.l_nlnr[:-2] \
-                        - prev_sample_info.cost_info.l_nom[:-2], axis=0) \
-                    + prev_sample_info.cost_info.l_nlnr[-1] \
-                    - prev_sample_info.cost_info.l_nom[-1] # see DDP pg 113
+                J_prev_traj = np.sum(prev_traj.cost_info.l_nlnr[:-1] \
+                        - prev_traj.cost_info.l_nom[:-1], axis=0) \
+                    + prev_traj.cost_info.l_nlnr[-1] \
+                    - prev_traj.cost_info.l_nom[-1] # see DDP pg 113
+                
+                J_prev_traj = J_prev_traj.squeeze() if J_prev_traj.ndim > 1 else J_prev_traj
                 #############################################################################
                 # calculate J for estimated cost and trajectory samples
                 gu_expand = np.expand_dims(new_sample_info.traj_info.gu, 2)
@@ -203,13 +206,15 @@ class TrajectoryOptimization(Dynamics):
 
                 alpha = self.linesearch_param
                 cost_change_scale     = (alpha * J_t1) + ((alpha**2)/2 * J_t2)
-                J_curr_traj = np.sum(new_sample_info.cost_info.l_nlnr[:-2] \
-                                - new_sample_info.cost_info.l_nom[:-2] , axis=0) \
+                J_curr_traj = np.sum(new_sample_info.cost_info.l_nlnr[:-1] \
+                                - new_sample_info.cost_info.l_nom[:-1], axis=0) \
                                 + new_sample_info.cost_info.l_nlnr[-1] \
                                 - new_sample_info.cost_info.l_nom[-1]
 
-                # find z
+                J_curr_traj = J_curr_traj.squeeze() if J_curr_traj.ndim > 1 else J_curr_traj
                 cost_change = (J_prev_traj - J_curr_traj)/cost_change_scale
+
+                cost_change = cost_change.squeeze() + 1e-6 # to remove -0 
 
                 rospy.loginfo('cost_change: {}, Jprev; {}, Jcur: {}'
                     .format(cost_change, J_prev_traj, J_curr_traj))
@@ -220,12 +225,11 @@ class TrajectoryOptimization(Dynamics):
             traj_samples[:-2] = [] if len(traj_samples) > 10 else traj_samples
             
             c = 0.5  # see DDP pg 113
-            if cost_change < c :#  and cost_change > -0.1: # accept the trajectory
-            # if cost_change > c and cost_change > -0.1: # accept the trajectory
+            if cost_change > c and cost_change > 1e-6: # accept the trajectory
 
                 # ros com params
                 start_time = Duration(secs = 0, nsecs = 0) # start asap
-                duration = Duration(secs = 0.01, nsecs = 0) # apply effort continuously without end duration = -1
+                duration = Duration(secs = duration_length, nsecs = 0) # apply effort continuously without end duration = -1
                 reference_frame = None #'empty/world/map'
 
                 wrench_base = Wrench()
@@ -263,8 +267,8 @@ class TrajectoryOptimization(Dynamics):
                                 * (np.sqrt(2)* self.l * np.sin(np.pi/4 - self.alpha))
 
                     rospy.loginfo('F1: {}, F2: {}, F3: {}'.format(F1, F2, F3))
-                    wrench_base.force.x = F2
-                    wrench_base.force.y = F1
+                    wrench_base.force.x = F1
+                    wrench_base.force.y = F2
                     base_angle.angular.z = F3
 
                     # send the torques to the base footprint
@@ -291,6 +295,7 @@ class TrajectoryOptimization(Dynamics):
             else: # repeat back+forward pass if integration diverged from prev traj by so much
                 rospy.loginfo('Repeating traj opt phase: iteration not accepted')
                 self.linesearch_param = self.linesearch_param - self.linesearch_param * 0.01
+                sample_info = self.get_traj_cost_info(noisy)
 
             rospy.loginfo('Finished Trajectory optimization process')
             
