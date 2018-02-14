@@ -253,8 +253,8 @@ class TrajectoryOptimization(Dynamics):
 
                 for t in range(T):
                     # send the computed torques to ROS
-                    # torques = new_sample_info.traj_info.delta_action[t,:]                    
-                    torques = new_sample_info.traj_info.nominal_action[t,:]                    
+                    torques = new_sample_info.traj_info.delta_action[t,:]                    
+                    # torques = new_sample_info.traj_info.nominal_action[t,:]                    
 
                     # calculate the genralized force and torques
                     bdyn = self.assemble_dynamics()
@@ -281,9 +281,11 @@ class TrajectoryOptimization(Dynamics):
                            + (sign_phi[0] * bdyn.f[0] + sign_phi[1] * bdyn.f[0] + sign_phi[2] * bdyn.f[0] + sign_phi[3] * bdyn.f[0]) \
                                 * (np.sqrt(2)* self.l * np.sin(np.pi/4 - self.alpha))
 
-                    wrench_base.force.x = F1    #*.15
-                    wrench_base.force.y = F2    #*.15
-                    base_angle.angular.z = F3   #*.15
+                    scale_factor = 0.98
+
+                    wrench_base.force.x = F1    * scale_factor
+                    wrench_base.force.y = F2    * scale_factor
+                    base_angle.angular.x = F3   * scale_factor
 
                     rospy.loginfo('F1: {}, F2: {}, F3: {}'.format(wrench_base.force.x, 
                             wrench_base.force.y, base_angle.angular.z))
@@ -297,14 +299,14 @@ class TrajectoryOptimization(Dynamics):
                     #     new_sample_info.traj_info.delta_action[t,:]))
 
                     # send the torques to the base footprint
-                    # self.pub.publish(base_angle)
+                    self.pub.publish(base_angle)
                     send_body_wrench('base_footprint', reference_frame,
                                                     None, wrench_base, start_time,
                                                     duration )
 
                     rospy.sleep(duration)
 
-                    clear_active_wrenches('base_footprint')
+                    # clear_active_wrenches('base_footprint')
 
                     # old_eta = eta
                     # eta = np.linalg.norm(new_sample_info.cost_info.V, ord=2)
@@ -322,9 +324,8 @@ class TrajectoryOptimization(Dynamics):
                     rospy.loginfo('Eta: {}'.format(abs(gs-cs)))
 
                     if save:
-                        f = open(savefile, 'ab')
-                        np.savetxt(savefile, np.expand_dims(bdyn.q, 0))
-                        f.close()
+                        with open(savefile, 'ab') as f:
+                            np.savetxt(f, np.expand_dims(bdyn.q, 0))
                 # set ubar_i = u_i, xbar_i = x_i and repeat traj_opt # step 5 DDP book
                 new_sample_info.traj_info.nominal_action = new_sample_info.traj_info.action
                 new_sample_info.traj_info.nominal_state  = new_sample_info.traj_info.state
