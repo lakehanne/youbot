@@ -19,6 +19,8 @@ from geometry_msgs.msg import Twist, \
         Pose, PoseStamped, Quaternion
 from tf.transformations import euler_from_quaternion
 
+# fix random seed
+np.random.seed(0)
 
 from scripts import __file__ as scripts_filepath
 scripts_filepath = os.path.abspath(scripts_filepath)
@@ -32,7 +34,7 @@ LOGGER = logging.getLogger(__name__)
 class Dynamics(MassMaker):
     def __init__(self, rate):
         super(Dynamics, self).__init__()
-        self.rate = 10  # 10Hz
+        self.rate = 30  # 10Hz
 
         mat_maker = MassMaker()
         mat_maker.get_mass_matrices()
@@ -213,9 +215,9 @@ class Dynamics(MassMaker):
         delta_u = np.zeros_like(u)
         delta_x = np.zeros_like(x)
 
-        u_bar   = np.random.randint(low=1, high=10, size=(T, dU))  #np.zeros_like(u) #
+        u_bar   = np.zeros_like(u) #np.random.randint(low=1, high=10, size=(T, dU))  #
         # initialize u_bar
-        # u_bar[:,] = config['trajectory']['init_action']
+        u_bar[:,] = config['trajectory']['init_action']
         x_bar   = np.zeros_like(x)
 
         fx      = np.zeros((T, dX, dX))
@@ -281,14 +283,14 @@ class Dynamics(MassMaker):
             #step 2.3 set up state-action deviations
             delta_x[k,:]     = x[k,:] - x_bar[k,:]
             delta_u[k,:]     = u[k,:] - u_bar[k,:]
-            delta_x_star = self.goal_state
+            delta_x_star     = self.goal_state
 
             # calculate cost-to-go and derivatives of nlnr stage_cost
             u_exp = self.expand_array(u[k,:], 1)
-            x_exp = self.expand_array(x[k,:]-delta_x_star, 1)            
+            x_exp = self.expand_array(x[k,:]-delta_x_star, 1)      
+            # print('x_exp: ', x_exp.shape, x[k,:].shape, delta_x_star.shape)      
             cost_action_nlnr_term = 0.5 * self.action_penalty[0] * u_exp.T.dot(u_exp)
             cost_state_nlnr_term  = 0.5 * self.state_penalty[0]  * x_exp.T.dot(x_exp)
-            # print('x_exp: ', x_exp.shape)
             cost_l12_nlnr_term    = np.sqrt(self.l21_const + (x_exp - delta_x_star).T.dot(x_exp - delta_x_star))
 
             # calculate cost-to-go and derivatives of stage_cost

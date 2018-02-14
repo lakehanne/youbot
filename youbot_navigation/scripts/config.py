@@ -1,10 +1,25 @@
+import os
+from os.path import join, expanduser
 import numpy as np
 from tf.transformations import euler_from_quaternion
 
-
-des_quat =  [1.0, 2.78940370874e-11, -4.09248993761e-11, -2.1263232087e-07]
+# retrieved this from /gazebo/link_states
+des_quat =  [1.0,-4.09248993761e-11, 2.78940370874e-11, -2.1263232087e-07]
 _,_,des_theta = euler_from_quaternion(des_quat, axes='sxyz')
 
+
+"""
+	GOAL STATE from /gazebo/link_states
+    position: 
+      x: -1.42604078657e-07
+      y: 7.64165118802e-08
+      z: 0.150000000174
+    orientation: 
+      x: -4.09248993761e-11
+      y: 2.78940370874e-11
+      z: -2.1263232087e-07
+      w: 1.0
+"""
 config = dict(
     num_samples =  5,
 	conditions = 4,
@@ -16,10 +31,9 @@ config = dict(
 	},
 
 	agent = {
-		# 'goal_state': np.asarray([[-1.42604078657e-07, 7.64165118802e-08, des_theta,
-		# 	                                    0, 0, 0]]).T,
-		'goal_state': np.asarray([1.25000, 0.65000, 0]).T,
-		'T':  100,
+		# 'goal_state': np.asarray([-1.42604078657e-07, 7.64165118802e-08, des_theta]).T,
+		'goal_state': np.asarray([0.82452343,  0.59753333,  0.07282408]).T,
+		'T':  40,
 		'dU': 4,
 		'dV': 4,
 		'dX': 3, # includes velocity terms
@@ -38,6 +52,8 @@ config = dict(
 	    'smooth_noise': True,
 	    'smooth_noise_var': 2.0,
 	    'smooth_noise_renormalize': True,
+	    'save_dir': join(expanduser('~'), 'catkin_ws', 'src', 'youbot', 
+	    				'youbot_navigation', 'data'),
 	},
 
 	trajectory = {
@@ -45,10 +61,10 @@ config = dict(
 								10.830327455656795, 
 								8.995303183020859, 
 								7.821391440870244]),
-		'stopping_condition': 1e-1, # condition at which we stop the algorithm
+		'stopping_condition': 0.01, #18.0348559119, # this is prob. dependent
 		'stopping_eta': 1e3, # initial eta
 		'c_zero': 1e-6, # zero term for c DP restart procedure
-		'duration_length': 3,  # amount of time to apply control law
+		'duration_length': 0.5,  # amount of time to apply control law
 	},
 
 	linearized_params = {

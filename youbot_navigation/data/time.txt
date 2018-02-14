@@ -1,0 +1,1 @@
+time taken: 1.90734863281e-06time taken: 148.315339804time taken: 139.437744856

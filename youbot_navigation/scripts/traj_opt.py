@@ -4,6 +4,7 @@
 from __future__ import print_function
 
 import os
+from os.path import join, expanduser
 import imp
 import time
 import copy
@@ -36,9 +37,9 @@ from scripts.algorithm_utils import IterationData, TrajectoryInfo, \
 
 from multiprocessing import Pool, Process
 
-# import matplotlib as mpl
-# mpl.use('QT4Agg')
-# import matplotlib.pyplot as plt
+import matplotlib as mpl
+mpl.use('QT4Agg')
+import matplotlib.pyplot as plt
 
 # fix seed
 np.random.seed(0)
@@ -93,7 +94,6 @@ class TrajectoryOptimization(Dynamics):
         self.delta            = config['agent']['delta']
         self.mu_min           = config['agent']['mu_min']
         self.delta_nut        = config['agent']['delta_nut']
-        # self.traj_info.nominal_action[:,] = config['trajectory']['init_action']
 
         self.config           = config
 
@@ -101,9 +101,10 @@ class TrajectoryOptimization(Dynamics):
         self.path = rp.get_path('youbot_navigation')
         self.pub  = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
 
-        # plt.ioff()
-        # self.fig = plt.figure()
-        # self._ax = self.fig.gca()
+        # mpl params
+        plt.ioff()
+        self.fig = plt.figure()
+        self._ax = self.fig.gca()
         self.linesearch_param = 1 # this is alpha in synthesis paper
         self.first_iteration = False
 
@@ -158,15 +159,28 @@ class TrajectoryOptimization(Dynamics):
             mu *= 0.09
         self.mu = mu
 
-    def do_traj_opt(self, sample_info, noisy=False):
+    def do_traj_opt(self, sample_info, noisy=False, save=False):
         T = self.T
+
+        save_dir = join(self.path, 'data')
+
+        if save:
+            os.makedirs(save_dir) if not os.path.exists(save_dir) else None
+            savefile = save_dir + '/trajectory.txt'
+            os.remove(savefile) if os.path.isfile(savefile) else None
+
         stop_cond = self.config['trajectory']['stopping_condition']
         eta       = self.config['trajectory']['stopping_eta']
         duration_length = self.config['trajectory']['duration_length']
 
         traj_samples = [] #use this to store traj info
         c_zero = self.config['trajectory']['c_zero']
-        while eta > stop_cond:
+
+        tic    = time.time()
+
+        run = True
+        # while eta >= stop_cond:
+        while run:
             prev_sample_info = self.backward(sample_info, noisy)
 
             new_sample_info  = self.forward(prev_sample_info, noisy)  
@@ -230,7 +244,7 @@ class TrajectoryOptimization(Dynamics):
                 # ros com params
                 start_time = Duration(secs = 0, nsecs = 0) # start asap
                 duration = Duration(secs = duration_length, nsecs = 0) # apply effort continuously without end duration = -1
-                reference_frame = None #'empty/world/map'
+                reference_frame = None #'empty/world/map' #"youbot::base_footprint" #
 
                 wrench_base = Wrench()
                 base_angle = Twist()
@@ -239,7 +253,7 @@ class TrajectoryOptimization(Dynamics):
 
                 for t in range(T):
                     # send the computed torques to ROS
-                    torques = new_sample_info.traj_info.action[t,:]
+                    torques = new_sample_info.traj_info.delta_action[t,:]                    
 
                     # calculate the genralized force and torques
                     bdyn = self.assemble_dynamics()
@@ -266,10 +280,20 @@ class TrajectoryOptimization(Dynamics):
                            + (sign_phi[0] * bdyn.f[0] + sign_phi[1] * bdyn.f[0] + sign_phi[2] * bdyn.f[0] + sign_phi[3] * bdyn.f[0]) \
                                 * (np.sqrt(2)* self.l * np.sin(np.pi/4 - self.alpha))
 
-                    rospy.loginfo('F1: {}, F2: {}, F3: {}'.format(F1, F2, F3))
-                    wrench_base.force.x = F1
-                    wrench_base.force.y = F2
-                    base_angle.angular.z = F3
+                    wrench_base.force.x = F1    *.15
+                    wrench_base.force.y = F2    *.15
+                    base_angle.angular.z = F3   *.15
+
+                    rospy.loginfo('F1: {}, F2: {}, F3: {}'.format(wrench_base.force.x, 
+                            wrench_base.force.y, base_angle.angular.z))
+
+                    state_change = bdyn.q - self.goal_state
+                    # rospy.loginfo("\nx: {}, \nx_bar: {}, \ndelx: {}, \nq: {}".format(
+                    #     new_sample_info.traj_info.state[t,:], new_sample_info.traj_info.nominal_state[t,:],
+                    #     new_sample_info.traj_info.delta_state[t,:], bdyn.q))
+                    # rospy.loginfo('\nu: {}, \nu_bar: {}, \ndelu: {}'.format(
+                    #     new_sample_info.traj_info.action[t,:], new_sample_info.traj_info.nominal_action[t,:], 
+                    #     new_sample_info.traj_info.delta_action[t,:]))
 
                     # send the torques to the base footprint
                     # self.pub.publish(base_angle)
@@ -281,14 +305,36 @@ class TrajectoryOptimization(Dynamics):
 
                     clear_active_wrenches('base_footprint')
 
+                    # old_eta = eta
+                    # eta = np.linalg.norm(new_sample_info.cost_info.V, ord=2)
+
+                    # rospy.loginfo('Eta decreased. Old eta {}--> New Eta: {}'.format(old_eta, eta))
+                    gs = np.linalg.norm(self.goal_state)
+                    cs = np.linalg.norm(bdyn.q)
+                    if np.allclose(gs, cs, rtol=0, atol=stop_cond):
+                        rospy.loginfo("Met stopping criterion. Robot reached goal state")
+                        # eta = stop_cond
+                        run = False
+                        break
+
+
+                    rospy.loginfo('Eta: {}'.format(eta))
+
+                    if save:
+                        f = open(savefile, 'ab')
+                        np.savetxt(savefile, np.expand_dims(bdyn.q, 0))
+                        f.close()
                 # set ubar_i = u_i, xbar_i = x_i and repeat traj_opt # step 5 DDP book
                 new_sample_info.traj_info.nominal_action = new_sample_info.traj_info.action
                 new_sample_info.traj_info.nominal_state  = new_sample_info.traj_info.state
 
-                old_eta = eta
-                eta = np.linalg.norm(new_sample_info.cost_info.V, ord=2)
+                if not run :
+                    print("Finished Traj Opt")
+                    break
+                # old_eta = eta
+                # eta = np.linalg.norm(new_sample_info.cost_info.V, ord=2)
 
-                rospy.loginfo('Eta decreased. Old eta {}--> New Eta: {}'.format(old_eta, eta))
+                # rospy.loginfo('Eta decreased. Old eta {}--> New Eta: {}'.format(old_eta, eta))
                 # repeat trajectory optimization process if eta does not meet stopping criteria
                 sample_info = new_sample_info 
 
@@ -298,7 +344,14 @@ class TrajectoryOptimization(Dynamics):
                 sample_info = self.get_traj_cost_info(noisy)
 
             rospy.loginfo('Finished Trajectory optimization process')
-            
+
+        toc = time.time()
+
+        rospy.loginfo("reaching the goal state took {} secs".format(toc-tic))
+
+        with open(save_dir + '/time.txt', 'a') as f:
+            f.write("time taken: %s" % str(toc-tic))
+
     def backward(self, sample_info, noisy=False):
         T  = self.T
         dU = self.dU
@@ -492,7 +545,7 @@ if __name__ == '__main__':
             # on first iteration, obtain trajectory samples from the robot
             sample_info = trajopt.get_traj_cost_info(noisy=False)
             stop_cond = hyperparams.config['agent']['TOL']
-            trajopt.do_traj_opt(sample_info, stop_cond)
+            trajopt.do_traj_opt(sample_info, stop_cond, save=True)
 
 
     except KeyboardInterrupt:
