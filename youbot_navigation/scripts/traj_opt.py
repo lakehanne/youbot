@@ -253,7 +253,8 @@ class TrajectoryOptimization(Dynamics):
 
                 for t in range(T):
                     # send the computed torques to ROS
-                    torques = new_sample_info.traj_info.delta_action[t,:]                    
+                    # torques = new_sample_info.traj_info.delta_action[t,:]                    
+                    torques = new_sample_info.traj_info.nominal_action[t,:]                    
 
                     # calculate the genralized force and torques
                     bdyn = self.assemble_dynamics()
@@ -280,9 +281,9 @@ class TrajectoryOptimization(Dynamics):
                            + (sign_phi[0] * bdyn.f[0] + sign_phi[1] * bdyn.f[0] + sign_phi[2] * bdyn.f[0] + sign_phi[3] * bdyn.f[0]) \
                                 * (np.sqrt(2)* self.l * np.sin(np.pi/4 - self.alpha))
 
-                    wrench_base.force.x = F1    *.15
-                    wrench_base.force.y = F2    *.15
-                    base_angle.angular.z = F3   *.15
+                    wrench_base.force.x = F1    #*.15
+                    wrench_base.force.y = F2    #*.15
+                    base_angle.angular.z = F3   #*.15
 
                     rospy.loginfo('F1: {}, F2: {}, F3: {}'.format(wrench_base.force.x, 
                             wrench_base.force.y, base_angle.angular.z))
@@ -318,7 +319,7 @@ class TrajectoryOptimization(Dynamics):
                         break
 
 
-                    rospy.loginfo('Eta: {}'.format(eta))
+                    rospy.loginfo('Eta: {}'.format(abs(gs-cs)))
 
                     if save:
                         f = open(savefile, 'ab')

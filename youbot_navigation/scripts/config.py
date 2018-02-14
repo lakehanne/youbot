@@ -61,10 +61,10 @@ config = dict(
 								10.830327455656795, 
 								8.995303183020859, 
 								7.821391440870244]),
-		'stopping_condition': 0.01, #18.0348559119, # this is prob. dependent
+		'stopping_condition': 0.08, #18.0348559119, # this is prob. dependent
 		'stopping_eta': 1e3, # initial eta
 		'c_zero': 1e-6, # zero term for c DP restart procedure
-		'duration_length': 0.5,  # amount of time to apply control law
+		'duration_length': 0.3,  # amount of time to apply control law
 	},
 
 	linearized_params = {
