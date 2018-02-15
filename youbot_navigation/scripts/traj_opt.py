@@ -281,14 +281,14 @@ class TrajectoryOptimization(Dynamics):
                            + (sign_phi[0] * bdyn.f[0] + sign_phi[1] * bdyn.f[0] + sign_phi[2] * bdyn.f[0] + sign_phi[3] * bdyn.f[0]) \
                                 * (np.sqrt(2)* self.l * np.sin(np.pi/4 - self.alpha))
 
-                    scale_factor = 0.98
+                    scale_factor = 0.28
 
                     wrench_base.force.x = F1    * scale_factor
                     wrench_base.force.y = F2    * scale_factor
-                    base_angle.angular.x = F3   * scale_factor
+                    wrench_base.torque.z = F3   * scale_factor
 
                     rospy.loginfo('F1: {}, F2: {}, F3: {}'.format(wrench_base.force.x, 
-                            wrench_base.force.y, base_angle.angular.z))
+                            wrench_base.force.y, wrench_base.torque.z))
 
                     state_change = bdyn.q - self.goal_state
                     # rospy.loginfo("\nx: {}, \nx_bar: {}, \ndelx: {}, \nq: {}".format(
@@ -306,12 +306,8 @@ class TrajectoryOptimization(Dynamics):
 
                     rospy.sleep(duration)
 
-                    # clear_active_wrenches('base_footprint')
+                    clear_active_wrenches('base_footprint')
 
-                    # old_eta = eta
-                    # eta = np.linalg.norm(new_sample_info.cost_info.V, ord=2)
-
-                    # rospy.loginfo('Eta decreased. Old eta {}--> New Eta: {}'.format(old_eta, eta))
                     gs = np.linalg.norm(self.goal_state)
                     cs = np.linalg.norm(bdyn.q)
                     if np.allclose(gs, cs, rtol=0, atol=stop_cond):
@@ -333,11 +329,7 @@ class TrajectoryOptimization(Dynamics):
                 if not run :
                     print("Finished Traj Opt")
                     break
-                # old_eta = eta
-                # eta = np.linalg.norm(new_sample_info.cost_info.V, ord=2)
 
-                # rospy.loginfo('Eta decreased. Old eta {}--> New Eta: {}'.format(old_eta, eta))
-                # repeat trajectory optimization process if eta does not meet stopping criteria
                 sample_info = new_sample_info 
 
             else: # repeat back+forward pass if integration diverged from prev traj by so much
@@ -349,7 +341,7 @@ class TrajectoryOptimization(Dynamics):
 
         toc = time.time()
 
-        rospy.loginfo("reaching the goal state took {} secs".format(toc-tic))
+        rospy.loginfo("Reaching the goal state took {} secs".format(toc-tic))
 
         with open(save_dir + '/time.txt', 'a') as f:
             f.write("time taken: %s" % str(toc-tic))
@@ -466,6 +458,7 @@ class TrajectoryOptimization(Dynamics):
                 # print('V: ', cost_info.V[t])
                 # print('Vx: \n', cost_info.Vx[t])
                 # print('Vxx: \n', cost_info.Vxx[t])
+                # print('Vxx: \n', cost_info.l[t])
                 # time.sleep(2)
 
             if non_pos_def: # restart the back-pass process
