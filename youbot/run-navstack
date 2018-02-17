@@ -1,0 +1,5 @@
+#! /bin/bash
+
+# launch the nav stack for the robot
+
+roslaunch youbot_navigation move_base.launch
