@@ -1,0 +1,3 @@
+[submodule "common-sensors"]
+	path = common-sensors
+	url = https://github.com/JenniferBuehler/common-sensors.git

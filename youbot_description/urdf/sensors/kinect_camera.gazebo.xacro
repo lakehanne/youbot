@@ -14,7 +14,7 @@
       <farClip>5</farClip>
       <updateRate>20.0</updateRate>
       <baseline>0.2</baseline>
-      <controller:gazebo_ros_camera name="${name}_depth_frame_controller" plugin="libgazebo_ros_camera.so">
+      <controller:gazebo_ros_camera name="${name}_depth_frame_controller" plugin="libgazebo_ros_openni_kinect.so">
         <alwaysOn>true</alwaysOn>
         <updateRate>20.0</updateRate>
         <imageTopicName>/camera/ir/image_raw</imageTopicName>
@@ -40,9 +40,9 @@
       <farClip>5</farClip>
       <updateRate>20.0</updateRate>
       <baseline>0.2</baseline>
-      <controller:gazebo_ros_camera name="${name}_rgb_frame_controller" plugin="libgazebo_ros_camera.so">
+      <controller:gazebo_ros_camera name="${name}_rgb_frame_controller" plugin="libgazebo_ros_openni_kinect.so">
         <alwaysOn>true</alwaysOn>
-        <updateRate>30.0</updateRate>
+        <updateRate>20.0</updateRate>
         <imageTopicName>/camera/rgb/image_raw</imageTopicName>
         <cameraInfoTopicName>/camera/rgb/camera_info</cameraInfoTopicName>
         <frameName>/${name}_rgb_optical_frame</frameName>

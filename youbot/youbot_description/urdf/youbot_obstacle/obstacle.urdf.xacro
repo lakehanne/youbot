@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<robot xmlns:sensor="http://playerstage.sourceforge.net/gazebo/xmlschema/#sensor"
+       xmlns:controller="http://playerstage.sourceforge.net/gazebo/xmlschema/#controller"
+       xmlns:interface="http://playerstage.sourceforge.net/gazebo/xmlschema/#interface"
+       xmlns:xacro="http://ros.org/wiki/xacro">
+
+
+  <xacro:include filename="$(find youbot_description)/urdf/youbot_obstacle/obstacle.gazebo.xacro"/>
+
+  <xacro:macro name="youbot_obstacle" params="name">
+    <link name="${name}_box">
+      <inertial>
+         <mass value="1e-2"/>
+         <inertia ixx="${1e-2/12}" ixy="0.0" ixz="0.0" 
+          iyy="${1e-2/12}" iyz="0.0000" 
+          izz="${1e-2/12}"/>
+      </inertial>
+      <visual>
+       <origin xyz="0 0 0" rpy="0 0 0" />
+       <geometry>
+         <box size="${2*0.15748} ${2*0.15748} ${0.35*0.8508}" />
+       </geometry>
+       <material name="orange"/>
+       <origin xyz="0 0 0" rpy="0 0 0" />
+      </visual>    
+      <collision>
+         <origin xyz="0 0 0" rpy="0 0 0" />
+         <geometry>        
+          <box size="${2*0.15748} ${2*0.15748} ${0.35*0.8508}}"  />
+         </geometry>
+      </collision>
+    </link>
+
+
+    <!-- youbot obstacle -->
+    <joint name="${name}_joint" type="fixed">
+      <origin xyz="${5*0.6} -0.15 0.0" rpy="0 0 0"/>
+      <parent link="wall_8"/>
+      <child link="${name}_box"/>
+    </joint>
+
+    <!-- extensions -->
+    <xacro:obstacle_box_gazebo/>
+
+  </xacro:macro>
+</robot>
+
