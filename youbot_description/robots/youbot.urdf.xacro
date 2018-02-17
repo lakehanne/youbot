@@ -30,8 +30,6 @@
   <xacro:include filename="$(find youbot_description)/urdf/sensors/hokuyo_urg04_laser.urdf.xacro"/>
 
   <!-- kinect -->
-  <xacro:include filename="$(find youbot_description)/urdf/sensors/kinect_camera.urdf.xacro"/>
-
   <xacro:include filename="$(find common_sensors)/urdf/sensors/kinect2.urdf.xacro"/>
 
   <!-- Now we can start using the macros xacro:included above to define the actual youbot -->
@@ -66,7 +64,7 @@
 
   <!-- kinect2 camera from Jennifer Buehler -->
   <xacro:kinect2 name="kinect_camera_rgb" parent="base_link" >
-    <origin xyz="${0.35} 0 0.25" rpy="0 0 0" />
+    <origin xyz="${0.3} 0 0.18" rpy="0 0 0" />
   </xacro:kinect2>
 
 </robot>
