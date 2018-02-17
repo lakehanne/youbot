@@ -1,0 +1,3 @@
+#!/bin/bash
+
+rosrun youbot_navigation traj_opt.py

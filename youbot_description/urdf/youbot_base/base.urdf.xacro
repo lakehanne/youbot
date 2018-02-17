@@ -39,6 +39,8 @@
   <property name="wheel_joint_velocity" value="10"/>
   <property name="wheel_joint_safety_k_velocity" value="10.0"/>
 
+  <property name="base_offset" value="-3.8" />
+
 
   <xacro:macro name="youbot_base" params="name">
     <link name="${name}_footprint">
@@ -62,7 +64,7 @@
       </collision>
     </link>
     <joint name="${name}_footprint_joint" type="fixed">
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <origin xyz="${base_offset} 0 0" rpy="0 0 0"/>
       <child link="${name}_link"/>
       <parent link="${name}_footprint"/>
     </joint>

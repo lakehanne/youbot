@@ -5,10 +5,9 @@
        xmlns:xacro="http://playerstage.sourceforge.net/gazebo/xmlschema/#interface"
        name="youbot" >
 
+  <xacro:property name="offset" value="-3.8" />
   <!-- The following xacro:included files set up definitions of parts of the robot body -->
   <!-- misc common stuff? -->
-  <xacro:include filename="$(find youbot_description)/urdf/common.xacro" />
-
   <!-- youbot base -->
   <xacro:include filename="$(find youbot_description)/urdf/youbot_base/base.urdf.xacro" />
 
@@ -49,28 +48,28 @@
   <xacro:youbot_base name="base"/>
 
   <xacro:youbot_plate name="plate" parent="base_link">
-    <origin xyz="-0.159 0 0.046" rpy="0 0 0" />
+    <origin xyz="${-0.159} 0 0.046" rpy="0 0 0" />
   </xacro:youbot_plate>
 
   <xacro:youbot_arm name="arm" parent="base_link">
-    <origin xyz="0.143 0 0.046" rpy="0 0 0" />
+    <origin xyz="${0.143} 0 0.046" rpy="0 0 0" />
   </xacro:youbot_arm>
 
   <xacro:youbot_gripper name="gripper" parent="arm_link_5">
-    <origin xyz="0 0 0" rpy="0 0 0" />
+    <origin xyz="${0} 0 0" rpy="0 0 0" />
   </xacro:youbot_gripper>
 
   <!-- base laser front -->
   <xacro:hokuyo_urg04_laser name="base_laser_front" parent="base" ros_topic="scan" update_rate="10" min_angle="-1.57" max_angle="1.57">
-    <origin xyz="0.3 0 -0.03" rpy="0 0 0"/>
+    <origin xyz="${0.3} 0 -0.03" rpy="0 0 0"/>
   </xacro:hokuyo_urg04_laser>
 
   <!-- <xacro:youbot_obstacle_box_gazebo/> -->
 
   <!-- kinect camera front -->
-<!--   <xacro:kinect_camera name="kinect_camera" parent="arm_link_4">
-    <origin xyz="0.2 0 0.33" rpy="0 0 0" />
-  </xacro:kinect_camera> -->
+  <xacro:kinect_camera name="kinect_camera" parent="arm_link_4">
+    <origin xyz="${0.2} 0 0.33" rpy="0 0 0" />
+  </xacro:kinect_camera>
 
 
 </robot>

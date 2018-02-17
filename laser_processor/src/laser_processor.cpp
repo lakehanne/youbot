@@ -56,6 +56,8 @@ public:
        return;
     }
 
+    pub = n_laser_.advertise<PointCloudT>("laser_cloud", 20);
+
     sensor_msgs::PointCloud cloud;
     PointCloudT::Ptr cloud_msg (new (PointCloudT)); // for publishing
     cloud_msg->header.frame_id = "laser_cloud";
@@ -77,8 +79,8 @@ public:
 
       if(updateCloud)
       {      
-        viewer->updatePointCloud(this->pclCloud, "laser_cloud");
         viewer->removePointCloud("laser_cloud");
+        viewer->updatePointCloud(this->pclCloud, "laser_cloud");
         pub.publish(cloud_msg);
       }
       looper.sleep();
@@ -100,7 +102,7 @@ public:
       // populate publishable cloud msgs
       cloud_msg->points.push_back(points);
 
-      // ROS_INFO("Laser Points: x: %.4f, y: %.4f, z: %.4f", points.x, points.y, points.z);
+      ROS_INFO("Laser Points: x: %.4f, y: %.4f, z: %.4f", points.x, points.y, points.z);
     }  
     this->pclCloud = pclCloud;
   }

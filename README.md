@@ -2,12 +2,17 @@
 
 * Gazebo model
   * `./run-gazebo-model`
+  * This launches the world, robot and the orange square obstacle
 
+
+* Run ILQG/DDP Trajectory optimization
+	* `./run_trajopt`
+	* This launches the DPP/ILQG algorithm used in navigating the robot from the start pose to the orange square box
+
+
+#### For Adaptive Monte Carlo Only
 * AMCL 
 	* `./run-navstack`
 
 * ActionLib Example
-	* `./run-goal-nav`
-
-* ILQR Hardcoded Trajectory Example
-	* `././run-simple-ilqr`
+	* `./run-goal-nav`	
