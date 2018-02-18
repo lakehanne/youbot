@@ -1,100 +1,98 @@
-""" This file defines the sample class. """
-import numpy as np
+
 
 class Sample(object):
-    """
-    Class that handles the representation of a trajectory and stores a
-    single trajectory.
-    Note: must be serializable for easy saving, no C++ references!
-    """
-    def __init__(self, agent):
-        self.agent = agent
+	"""docstring for Sample"""
+	def __init__(self, hyperparams):
+		super(Sample, self).__init__()
+		self.agent = hyperparams['agent']
 
-        self.T = agent.T
-        self.dX = agent.dX
-        self.dU = agent.dU
-        self.dO = agent.dO
-        self.dM = agent.dM
+        self.T = self.agent['T']
+        self.dU = self.agent['dU']
+        self.dV = self.agent['dV']
+        self.dX = self.agent['dX']
+        self.dO = self.agent['dO']
 
-        # Dictionary containing the sample data from various sensors.
-        self._data = {}
-
-        self._X = np.empty((self.T, self.dX))
-        self._X.fill(np.nan)
         self._obs = np.empty((self.T, self.dO))
         self._obs.fill(np.nan)
-        self._meta = np.empty(self.dM)
-        self._meta.fill(np.nan)
 
-    def set(self, sensor_name, sensor_data, t=None):
+	    self._X = np.empty((self.T, self.dX))
+	    self._X.fill(np.nan)
+
+    def set(self, t=None):
         """ Set trajectory data for a particular sensor. """
         if t is None:
-            self._data[sensor_name] = sensor_data
             self._X.fill(np.nan)  # Invalidate existing X.
             self._obs.fill(np.nan)  # Invalidate existing obs.
-            self._meta.fill(np.nan)  # Invalidate existing meta data.
         else:
-            if sensor_name not in self._data:
-                self._data[sensor_name] = \
-                        np.empty((self.T,) + sensor_data.shape)
-                self._data[sensor_name].fill(np.nan)
-            self._data[sensor_name][t, :] = sensor_data
             self._X[t, :].fill(np.nan)
             self._obs[t, :].fill(np.nan)
 
-    def get(self, sensor_name, t=None):
-        """ Get trajectory data for a particular sensor. """
-        return (self._data[sensor_name] if t is None
-                else self._data[sensor_name][t, :])
-
-    def get_X(self, t=None):
-        """ Get the state. Put it together if not precomputed. """
+	def get_X(self, t=None):
         X = self._X if t is None else self._X[t, :]
-        if np.any(np.isnan(X)):
-            for data_type in self._data:
-                if data_type not in self.agent.x_data_types:
-                    continue
-                data = (self._data[data_type] if t is None
-                        else self._data[data_type][t, :])
-                self.agent.pack_data_x(X, data, data_types=[data_type])
-        return X
 
-    def get_U(self, t=None):
-        """ Get the action. """
-        return self._data[ACTION] if t is None else self._data[ACTION][t, :]
+        return X
 
     def get_obs(self, t=None):
         """ Get the observation. Put it together if not precomputed. """
         obs = self._obs if t is None else self._obs[t, :]
-        if np.any(np.isnan(obs)):
-            for data_type in self._data:
-                if data_type not in self.agent.obs_data_types:
-                    continue
-                if data_type in self.agent.meta_data_types:
-                    continue
-                data = (self._data[data_type] if t is None
-                        else self._data[data_type][t, :])
-                self.agent.pack_data_obs(obs, data, data_types=[data_type])
-        return obs
+        
+        return obs    
 
-    def get_meta(self):
-        """ Get the meta data. Put it together if not precomputed. """
-        meta = self._meta
-        if np.any(np.isnan(meta)):
-            for data_type in self._data:
-                if data_type not in self.agent.meta_data_types:
-                    continue
-                data = self._data[data_type]
-                self.agent.pack_data_meta(meta, data, data_types=[data_type])
-        return meta
-
-    # For pickling.
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        state.pop('agent')
-        return state
-
-    # For unpickling.
-    def __setstate__(self, state):
-        self.__dict__ = state
-        self.__dict__['agent'] = None
+		
+def sample(self, policy, condition, verbose=True, save=True, noisy=True):
+        """
+        Runs a trial and constructs a new sample containing information
+        about the trial.
+        Args:
+            policy: Policy to be used in the trial.
+            condition: Which condition setup to run.
+            verbose: Whether or not to plot the trial.
+            save: Whether or not to store the trial into the samples.
+            noisy: Whether or not to use noise during sampling.
+        """
+        # Create new sample, populate first time step.
+        feature_fn = None
+        if 'get_features' in dir(policy):
+            feature_fn = policy.get_features
+        new_sample = self._init_sample(condition, feature_fn=feature_fn)
+        # new_sample_adv = copy.deepcopy(new_sample)
+        mj_X = self._hyperparams['x0'][condition]
+        U = np.zeros([self.T, self.dU])
+        V = np.zeros([self.T, self.dV])
+        if noisy:
+            noise = generate_noise(self.T, self.dU, self._hyperparams)
+        else:
+            noise = np.zeros((self.T, self.dU))
+        if np.any(self._hyperparams['x0var'][condition] > 0):
+            x0n = self._hyperparams['x0var'] * \
+                    np.random.randn(self._hyperparams['x0var'].shape)
+            mj_X += x0n
+        noisy_body_idx = self._hyperparams['noisy_body_idx'][condition]
+        if noisy_body_idx.size > 0:
+            for i in range(len(noisy_body_idx)):
+                idx = noisy_body_idx[i]
+                var = self._hyperparams['noisy_body_var'][condition][i]
+                self._model[condition]['body_pos'][idx, :] += \
+                        var * np.random.randn(1, 3)
+        # Take the sample.
+        for t in range(self.T):
+            X_t = new_sample.get_X(t=t) #see sample.py
+            obs_t = new_sample.get_obs(t=t)
+            mj_U = policy.act_u(X_t, obs_t, t, noise[t, :])
+            mj_V = policy.act_v(X_t, obs_t, t, noise[t, :])
+            U[t, :] = mj_U
+            V[t, :] = mj_V
+            if verbose:
+                self._world[condition].plot(mj_X)
+            if (t + 1) < self.T:
+                for _ in range(self._hyperparams['substeps']):
+                    mj_X, _ = self._world[condition].step(mj_X, mj_U)  # run the passive dynamics
+                    # mj_X, _ = self._world[condition].step(mj_X, mj_V)  # run the passive dynamics
+                self._data = self._world[condition].get_data()
+                self._set_sample(new_sample, mj_X, t, condition, feature_fn=feature_fn)
+        new_sample.set(ACTION, U)
+        new_sample.set(NOISE, noise)
+        new_sample.set(ACTION_V, V)
+        if save:
+            self._samples[condition].append(new_sample)
+        return new_sample

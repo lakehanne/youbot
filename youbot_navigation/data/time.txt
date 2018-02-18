@@ -1,1 +1,1 @@
-time taken: 57.6589632034
+time taken: 57.6589632034time taken: 54.3244929314time taken: 37.4784600735

@@ -327,7 +327,8 @@ class TrajectoryOptimization(Dynamics):
                 new_sample_info.traj_info.nominal_state  = new_sample_info.traj_info.state
 
                 if not run :
-                    print("Finished Traj Opt")
+                    print("Finished Traj Opt. Returning to home position")
+                    self.goal_state = np.array([0, 0, 0])
                     break
 
                 sample_info = new_sample_info 

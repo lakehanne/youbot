@@ -10,7 +10,7 @@ import multiprocessing
 from nav_msgs.msg import Odometry
 from collections import namedtuple
 
-from scripts.constants import MassMaker
+from scripts.dynamics.constants import MassMaker
 from scripts.algorithm_utils import TrajectoryInfo, \
                             generate_noise, CostInfo
 
