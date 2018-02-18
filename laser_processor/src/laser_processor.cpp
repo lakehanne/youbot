@@ -35,11 +35,12 @@ private:
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclCloud;
 
   bool updateCloud;
+  bool spill;
 
   boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer;
 
 public:
-  laser_clouds(ros::NodeHandle n_laser);
+  laser_clouds(ros::NodeHandle n_laser, bool spill);
   ~laser_clouds(){}
   boost::shared_ptr<pcl::visualization::PCLVisualizer> viewerCreator();
   void keyboardEventOccurred (const pcl::visualization::KeyboardEvent &event,
@@ -102,14 +103,15 @@ public:
       // populate publishable cloud msgs
       cloud_msg->points.push_back(points);
 
-      ROS_INFO("Laser Points: x: %.4f, y: %.4f, z: %.4f", points.x, points.y, points.z);
+      if(spill)
+        ROS_INFO("Laser Points: x: %.4f, y: %.4f, z: %.4f", points.x, points.y, points.z);
     }  
     this->pclCloud = pclCloud;
   }
 };
 
-laser_clouds::laser_clouds(ros::NodeHandle n_laser)
-  : updateCloud(false), n_laser_(n_laser){
+laser_clouds::laser_clouds(ros::NodeHandle n_laser, bool spill)
+  : updateCloud(false), n_laser_(n_laser), spill(spill){
     viewer = laser_clouds::viewerCreator();
     pub = n_laser_.advertise<PointCloudT>("laser_cloud", 1);
   }
@@ -148,8 +150,9 @@ int main(int argc, char** argv)
 {
 	ros::init(argc, argv, "laser_scans");
 
+  bool spill(false);
 	ros::NodeHandle n_laser;
-  laser_clouds ls(n_laser);
+  laser_clouds ls(n_laser, spill);
 	ros::Subscriber sub = n_laser.subscribe("/scan", 1000, &laser_clouds::laserCallback, &ls);
 
 	ros::spin();

@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<launch>
+
+<!-- laser /scan processor node-->
+<node pkg="laser_processor" type="laser_processor" name="laser_processor_node"/>
+
+<!-- youbot navigation with ilqg -->
+<node pkg="youbot_navigation" type="traj_opt.py" name="trajectory_optimization_node"/>
+
+</launch>

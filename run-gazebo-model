@@ -6,5 +6,3 @@ sudo killall roscore
 sudo killall rosmaster
 
 roslaunch youbot_gazebo_robot youbot.launch
-
-rosrun laser_processor laser_processor 
