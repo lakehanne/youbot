@@ -5,10 +5,15 @@
        xmlns:xacro="http://ros.org/wiki/xacro">
 
 
-  <xacro:macro name="youbot_obstacle_box_gazebo">
-    <gazebo reference="youbot_obstacle">
+  <xacro:macro name="youbot_obstacle_gazebo">
+    <gazebo reference="youbot_obstacle_box">
       <material value="Gazebo/Orange" />
     </gazebo>  
+
+    <gazebo reference="youbot_obstacle_right_corner_wall">
+      <material value="Gazebo/Gray" />
+    </gazebo>  
+    
 
   </xacro:macro>
 

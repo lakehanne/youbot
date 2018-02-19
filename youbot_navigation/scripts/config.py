@@ -31,8 +31,8 @@ config = dict(
 	},
 
 	agent = {
-		# 'goal_state': np.asarray([-1.42604078657e-07, 7.64165118802e-08, des_theta]).T,
-		'goal_state': np.asarray([0.82452343,  0.59753333,  0.07282408]).T,
+		'goal_state': np.asarray([1.3, 0.8, 0]).T,
+		# 'goal_state': np.asarray([0.82452343,  0.59753333,  0.07282408]).T,
 		'T':  40,
 		'dU': 4,
 		'dV': 4,

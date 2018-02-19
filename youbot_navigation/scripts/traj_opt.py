@@ -287,8 +287,8 @@ class TrajectoryOptimization(Dynamics):
                     wrench_base.force.y = F2    * scale_factor
                     wrench_base.torque.z = F3   * scale_factor
 
-                    rospy.loginfo('F1: {}, F2: {}, F3: {}'.format(wrench_base.force.x, 
-                            wrench_base.force.y, wrench_base.torque.z))
+                    # rospy.loginfo('F1: {}, F2: {}, F3: {}'.format(wrench_base.force.x, 
+                    #         wrench_base.force.y, wrench_base.torque.z))
 
                     state_change = bdyn.q - self.goal_state
                     # rospy.loginfo("\nx: {}, \nx_bar: {}, \ndelx: {}, \nq: {}".format(

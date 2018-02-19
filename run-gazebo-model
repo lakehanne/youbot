@@ -5,4 +5,7 @@ sudo killall gzclient
 sudo killall roscore
 sudo killall rosmaster
 
-roslaunch youbot_gazebo_robot youbot.launch
+roslaunch youbot_gazebo_robot youbot.launch 
+&& 
+rosrun gazebo_ros spawn_model -file `rospack find youbot_description`/urdf/youbot_obstacle/obstacle.urdf  -urdf -x 1.3 -y 0.8 -z 1.0 -model obstacle -robot_namespace youbot
+

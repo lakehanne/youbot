@@ -32,6 +32,8 @@
   <!-- kinect -->
   <xacro:include filename="$(find common_sensors)/urdf/sensors/kinect2.urdf.xacro"/>
 
+  <!-- youbot obstacle -->
+  <!-- <xacro:include filename="$(find youbot_description)/urdf/youbot_obstacle/obstacle.urdf.xacro" /> -->
   <!-- Now we can start using the macros xacro:included above to define the actual youbot -->
 
   <!-- The first use of a macro.  This one was defined in base.urdf.xacro above.
@@ -64,7 +66,13 @@
 
   <!-- kinect2 camera from Jennifer Buehler -->
   <xacro:kinect2 name="kinect_camera_rgb" parent="base_link" >
-    <origin xyz="${0.4} 0 0.48" rpy="0 ${M_PI/20} 0" />
+    <origin xyz="${0.4} 0 0.42" rpy="0 ${M_PI/10} 0" />
   </xacro:kinect2>
+
+  <!-- World obstacle -->
+<!--   <xacro:youbot_obstacle name="youbot_obstacle" parent="youbot_obstacle_right_corner_wall" >
+    <origin xyz="${0.0} 0 0.0" rpy="0 ${0/10} 0" />
+  </xacro:youbot_obstacle> -->
+    <!-- <xacro:macro name="youbot_obstacle"> -->
 
 </robot>
