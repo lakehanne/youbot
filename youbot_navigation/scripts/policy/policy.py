@@ -1,19 +1,90 @@
 #!/usr/bin/env python
 
+import PIL
 import cv2
 import time
+import math
 import rospy
 import threading
+import numpy as np
+from PIL import Image
 from scripts.algorithm_utils import Alex2D
 from scripts.subscribers import KinectReceiver
 
+import sys
+import torch
+import torch.nn as nn
+from torch.autograd.variable import Variable
+
+# from IPython.core import ultratb
+# sys.excepthook = ultratb.FormattedTB(mode='Verbose',
+#      color_scheme='Linux', call_pdb=1)
+
+use_cuda 	 = torch.cuda.is_available()
+FloatTensor  = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
+DoubleTensor = torch.cuda.DoubleTensor if use_cuda else torch.DoubleTensor
+LongTensor   = torch.cuda.LongTensor if use_cuda else torch.LongTensor
+ByteTensor   = torch.cuda.ByteTensor if use_cuda else torch.ByteTensor
+Tensor       = FloatTensor
+
+if use_cuda:
+	LOGGER.info("Running on GPU: {}".format(torch.cuda.current_device()))
+
 class ProcessObservations(object):
-	def __init__(self, rate=30, verbose=False):
+	def __init__(self, rate=30, verbose=False, test=False):
 		super(ProcessObservations, self).__init__()
-		self.kr = KinectReceiver()
+		self.kr = KinectReceiver(verbose)
 		self.verbose = verbose
 		self.rate = rate
+
 		self.net = Alex2D()
+
+		if not test:
+			self.net.apply(self.weights_init)
+
+		if use_cuda:
+			with torch.cuda.device(0):
+				self.net = self.net.cuda()
+
+	def weights_init(self, m):
+		for m in m.modules():
+			if isinstance(m, nn.Conv2d):
+				n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+				m.weight.data.normal_(0, math.sqrt(2. / n))
+			elif isinstance(m, nn.BatchNorm2d):
+				m.weight.data.fill_(1)
+				m.bias.data.zero_()
+			elif isinstance(m, nn.Linear):
+				size = m.weight.size()
+				fan_out = size[0] # number of rows
+				fan_in = size[1] # number of columns
+				variance = np.sqrt(2.0/(fan_in + fan_out))
+				m.weight.data.normal_(0.0, variance)
+			elif isinstance(m, nn.LSTM):
+				for key in m.state_dict().keys():
+					map(lambda x: init.uniform(x, 0, 1), m.state_dict().values())
+			elif isinstance(m, nn.LSTMCell):
+				for key in m.state_dict().keys():
+					map(lambda x: init.uniform(x, 0, 1), m.state_dict().values())
+
+	def resize_ndarray(self, array, resize_shape=(240, 240) ):
+		assert array.ndim == 4 or array.ndim == 3, 'dims of array to be resized not understood'
+		'array dimensions should be 3D or 4D. Got {} dims'.format(array.ndim)
+
+		if array.ndim == 4:
+			square_image = np.zeros((array.shape[0],array.shape[1])+resize_shape)
+			for channel in range(array.shape[0]):
+				for structs in range(array.shape[1]):
+					pil_image =  PIL.Image.fromarray(array[channel, structs,:,:])
+					square_image[channel, structs,:,:] = np.asarray(pil_image.resize(resize_shape, Image.NEAREST)).astype(np.float64)
+		elif array.ndim == 3:
+			square_image = np.zeros((array.shape[0],)+resize_shape)
+			for channel in range(array.shape[0]):
+				pil_image =  PIL.Image.fromarray(array[channel,:,:])
+				square_image[channel, :,:] = np.asarray(pil_image.resize(resize_shape, Image.NEAREST)).astype(np.float64)
+		else:
+			LOGGER.critical('type of array not understood')
+		return square_image
 
 	def convolve_rgb(self):
 		image = self.kr.rgb_img
@@ -40,24 +111,29 @@ class ProcessObservations(object):
 				x,y = featpoint.pt
 				cv2.circle(image,(int(x),int(y)), 3, (0,0,255), -1)
 
-			cv2.imshow('rgb image', image)
-
-			imageT = image.transpose()
+			# cv2.imshow('rgb image', image)
 			
-			print(imageT.shape)
+			square_image = self.resize_ndarray(image.transpose(), resize_shape=(240, 240))
+			square_image_t = Variable(torch.from_numpy(square_image))
+			print(square_image_t.size())
 
-try:
-	rospy.init_node('image_subscriber')
+			output = self.net(square_image_t, None)
 
-	rate = 30
+			print(output.shape)
 
-	po = ProcessObservations(rate=rate, verbose=False)
 
-	sleeper = rospy.Rate(rate)
+# try:
+rospy.init_node('image_subscriber')
 
-	while not rospy.is_shutdown():
-		po.convolve_rgb()	
-		sleeper.sleep()
+rate = 30
 
-except Exception as e:
-	raise e	
+po = ProcessObservations(rate=rate, verbose=True)
+
+sleeper = rospy.Rate(rate)
+
+while not rospy.is_shutdown():
+	po.convolve_rgb()	
+	sleeper.sleep()
+
+# except Exception as e:
+	# raise e	

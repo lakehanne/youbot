@@ -56,7 +56,6 @@ class Dynamics(MassMaker):
         sleeper = rospy.Rate(self.rate)
         sleeper.sleep()
 
-
     def assemble_dynamics(self):
         # time for accelaeration calculation
         prev_time = rospy.get_rostime().to_sec()
@@ -187,7 +186,6 @@ class Dynamics(MassMaker):
 
     def expand_array(self, array, dim):
         return np.expand_dims(array, axis=dim)
-
 
     def get_samples(self, noisy=False):
         """
