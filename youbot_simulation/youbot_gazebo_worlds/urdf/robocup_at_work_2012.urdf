@@ -327,10 +327,9 @@
   <material>Gazebo/Gray</material>
   <selfCollide>true</selfCollide>
   </gazebo>
-<!--   <gazebo reference="wall_10">
+  <gazebo reference="wall_10">
   <material>Gazebo/Gray</material>
   <selfCollide>true</selfCollide>
-  </gazebo> -->
 <!--   <gazebo reference="orange_box">
   <material>Gazebo/Orange</material>
   <selfCollide>false</selfCollide>
