@@ -1,3 +1,0 @@
-#! /bin/bash
-
-rosrun youbot_navigation nav_target

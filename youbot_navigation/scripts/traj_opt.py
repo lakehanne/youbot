@@ -204,7 +204,7 @@ class TrajectoryOptimization(Dynamics):
                 J_prev_traj = np.sum(prev_traj.cost_info.l_nlnr[:-1] \
                         - prev_traj.cost_info.l_nom[:-1], axis=0) \
                     + prev_traj.cost_info.l_nlnr[-1] \
-                    - prev_traj.cost_info.l_nom[-1] # see DDP pg 113
+                    - prev_traj.cost_info.l_nom[-1] # see DDP Jacobson pg 113
                 
                 J_prev_traj = J_prev_traj.squeeze() if J_prev_traj.ndim > 1 else J_prev_traj
                 #############################################################################
@@ -281,7 +281,7 @@ class TrajectoryOptimization(Dynamics):
                            + (sign_phi[0] * bdyn.f[0] + sign_phi[1] * bdyn.f[0] + sign_phi[2] * bdyn.f[0] + sign_phi[3] * bdyn.f[0]) \
                                 * (np.sqrt(2)* self.l * np.sin(np.pi/4 - self.alpha))
 
-                    scale_factor = 0.28
+                    scale_factor = 1 #0.28
 
                     wrench_base.force.x = F1    * scale_factor
                     wrench_base.force.y = F2    * scale_factor
@@ -291,9 +291,10 @@ class TrajectoryOptimization(Dynamics):
                             wrench_base.force.y, wrench_base.torque.z))
 
                     state_change = bdyn.q - self.goal_state
-                    # rospy.loginfo("\nx: {}, \nx_bar: {}, \ndelx: {}, \nq: {}".format(
-                    #     new_sample_info.traj_info.state[t,:], new_sample_info.traj_info.nominal_state[t,:],
-                    #     new_sample_info.traj_info.delta_state[t,:], bdyn.q))
+                    # rospy.loginfo("\nx:\t {}, \nq:\t {}, \nx_bar:\t {}, \ndelx:\t {}".format(
+                    #     new_sample_info.traj_info.state[t,:], bdyn.q, 
+                    #     new_sample_info.traj_info.nominal_state[t,:],
+                    #     new_sample_info.traj_info.delta_state[t,:]))
                     # rospy.loginfo('\nu: {}, \nu_bar: {}, \ndelu: {}'.format(
                     #     new_sample_info.traj_info.action[t,:], new_sample_info.traj_info.nominal_action[t,:], 
                     #     new_sample_info.traj_info.delta_action[t,:]))

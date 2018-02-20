@@ -94,8 +94,8 @@ class Dynamics(MassMaker):
         # quaternion = [self.odom.pose.pose.orientation.w, self.odom.pose.pose.orientation.x,
         #                 self.odom.pose.pose.orientation.y,self.odom.pose.pose.orientation.z] 
         # see https://answers.ros.org/question/69754/quaternion-transformations-in-python/      
-        quaternion = [self.odom.pose.pose.orientation.x, self.odom.pose.pose.orientation.y,
-                        self.odom.pose.pose.orientation.z, self.odom.pose.pose.orientation.w]
+        quaternion = [self.odom.pose.pose.orientation.w, self.odom.pose.pose.orientation.x,
+                        self.odom.pose.pose.orientation.y, self.odom.pose.pose.orientation.z]
         _, _, theta = euler_from_quaternion(quaternion, axes='sxyz')
         # theta -= np.pi/2.0  # account for diffs of frames in gazebo and paper
 

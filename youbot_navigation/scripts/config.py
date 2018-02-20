@@ -24,15 +24,15 @@ config = dict(
     num_samples =  5,
 	conditions = 4,
 	cost_params = {
-		'action_penalty': np.array([0.0001, 0.0001, 0.0001, 0.0001]),
+		'action_penalty': np.array([1e-4, 1e-4, 1e-4, 1e-4]),
 		'state_penalty': np.array([1, 1, 1]),
 		'final_cost_weight': 1e-2,
 		'stage_cost_weight': 1e-2,
 	},
 
 	agent = {
-		# 'goal_state': np.asarray([-1.42604078657e-07, 7.64165118802e-08, des_theta]).T,
-		'goal_state': np.asarray([0.82452343,  0.59753333,  0.07282408]).T,
+		'goal_state': np.asarray([1.3, 0.8, 0]).T,
+		# 'goal_state': np.asarray([0.82452343,  0.59753333,  0.07282408]).T,
 		'T':  40,
 		'dU': 4,
 		'dV': 4,

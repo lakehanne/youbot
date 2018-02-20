@@ -1,9 +1,0 @@
-#! /bin/bash
-
-killall roscore
-killall gzclient
-killall gzserver
-
-roslaunch youbot_gazebo_robot youbot.launch 
-
-# <remap from="base_scan" to="/scan"/> 

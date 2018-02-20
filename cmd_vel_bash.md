@@ -15,3 +15,9 @@ start_time:
 duration:
   secs: 40
   nsecs: 0"
+
+# first spawn urdf
+rosrun xacro xacro `rospack find youbot_description`/urdf/youbot_obstacle/obstacle.urdf.xacro >> `rospack find youbot_description`/urdf/youbot_obstacle/obstacle.urdf
+
+rosrun gazebo_ros spawn_model -file `rospack find youbot_description`/urdf/youbot_obstacle/obstacle.urdf  -urdf -x 1.3 -y 0.8 -z 1.0 -model box -robot_namespace youbot
+

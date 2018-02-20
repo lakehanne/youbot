@@ -1,0 +1,1 @@
+from .images_subscriber import KinectReceiver

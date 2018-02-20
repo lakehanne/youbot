@@ -25,7 +25,7 @@
     <child link="wall_2"/>
   </joint>
 
-    <link name="wall_2">
+  <link name="wall_2">
     <inertial>
       <origin xyz="0 0 0" /> 
       <mass value="10.0" />
@@ -258,7 +258,7 @@
 
 
   <!-- youbot obstacle -->
-  <joint name="join_box" type="fixed">
+<!--   <joint name="join_box" type="fixed">
     <origin xyz="${5*0.6} -0.15 0.0" rpy="0 0 0"/>
     <parent link="wall_8"/>
     <child link="orange_box"/>
@@ -287,7 +287,7 @@
         <box size="${2*0.15748} ${2*0.15748} ${0.35*0.8508}"  />
        </geometry>
     </collision>
-  </link>
+  </link> -->
 
 
 
@@ -327,13 +327,13 @@
   <material>Gazebo/Gray</material>
   <selfCollide>true</selfCollide>
   </gazebo>
-  <gazebo reference="wall_10">
+<!--   <gazebo reference="wall_10">
   <material>Gazebo/Gray</material>
   <selfCollide>true</selfCollide>
-  </gazebo>
-  <gazebo reference="orange_box">
+  </gazebo> -->
+<!--   <gazebo reference="orange_box">
   <material>Gazebo/Orange</material>
-  <selfCollide>true</selfCollide>
-  </gazebo>  
+  <selfCollide>false</selfCollide>
+  </gazebo>   -->
 
 </robot>
