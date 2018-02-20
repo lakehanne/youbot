@@ -17,13 +17,10 @@ import numpy as np
 import scipy as sp
 # import pathos.pools as pp
 
-
-import tf
-import tf2_ros
 import rospkg
 from rospy.rostime import Duration
 
-from geometry_msgs.msg import Wrench, Twist, TransformStamped
+from geometry_msgs.msg import Wrench, Twist
 
 # import torque and wrench services
 from scripts.services import send_joint_torques, clear_active_forces, \
@@ -37,6 +34,7 @@ from scripts.dynamics import Dynamics
 from scripts.sample import SampleList
 from scripts.algorithm_utils import IterationData, TrajectoryInfo, \
                             generate_noise, CostInfo
+
 from multiprocessing import Pool, Process
 
 import matplotlib as mpl
@@ -85,7 +83,7 @@ class TrajectoryOptimization(Dynamics):
         self.dX               = config['agent']['dX']
         self.euler_step       = config['agent']['euler_step']
         self.euler_iter       = config['agent']['euler_iter']
-        self.goal_state       = None #config['agent']['goal_state']
+        self.goal_state       = config['agent']['goal_state']
         self.l21_const        = config['agent']['alpha']
         self.action_penalty   = config['cost_params']['action_penalty']
         self.state_penalty    = config['cost_params']['state_penalty']
@@ -110,27 +108,6 @@ class TrajectoryOptimization(Dynamics):
         self.linesearch_param = 1 # this is alpha in synthesis paper
         self.first_iteration = False
 
-    def broadcast_tf(self):
-        """
-        sends tf2 transform from the base_link of the robot 
-        to the obstacle"
-        """
-        br = tf2_ros.TransformBroadcaster()
-        trans = TransformStamped()
-
-        trans.header.stamp = rospy.Time.now()
-        trans.header.frame_id = "base_link"
-        trans.child_frame_id = "youbot_obstacle_box"
-        trans.transform.translation.x = self.boxtacle_pose[0]
-        trans.transform.translation.y = self.boxtacle_pose[1]
-        trans.transform.translation.z = self.boxtacle_pose[2]
-        trans.transform.rotation.x = self.boxtacle_pose[3]
-        trans.transform.rotation.y = self.boxtacle_pose[4]
-        trans.transform.rotation.z = self.boxtacle_pose[5]
-        trans.transform.rotation.w = self.boxtacle_pose[6]
-
-        br.sendTransform(trans)        
-
     def get_state_rhs_eq(bdyn, x, u):
         M, C, B, S, f = bdyn.M, bdyn.C, bdyn.B, bdyn.S, bdyn.f
         Minv          = np.linalg.inv(M)
@@ -149,21 +126,21 @@ class TrajectoryOptimization(Dynamics):
         cur.traj_info = sample['traj_info']
         cur.cost_info = sample['cost_info']
 
-        if self.args.plot_state:
-            self._ax.plot(traj_info.nominal_state[t:,:], 'b', label='qpos', fontweight='bold')
-            # self._ax.plot(tt, nominal_state[:,1], 'g', label='qpos', fontweight='bold')
-            self._ax.legend(loc='best')
-            self._ax.set_xlabel('time (discretized)', fontweight='bold')
-            self._ax.set_ylabel('final q after integration', fontweight='bold')
-            self._ax.grid()
-            self._ax.gcf().set_size_inches(10,4)
-            self._ax.cla()
+        # if self.args.plot_state:
+        #     self._ax.plot(traj_info.nominal_state[t:,:], 'b', label='qpos', fontweight='bold')
+        #     # self._ax.plot(tt, nominal_state[:,1], 'g', label='qpos', fontweight='bold')
+        #     self._ax.legend(loc='best')
+        #     self._ax.set_xlabel('time (discretized)', fontweight='bold')
+        #     self._ax.set_ylabel('final q after integration', fontweight='bold')
+        #     self._ax.grid()
+        #     self._ax.gcf().set_size_inches(10,4)
+        #     self._ax.cla()
 
-            if self.args.save_figs:
-                figs_dir = os.path.join(self.path, 'figures')
-                os.mkdir(figs_dir) if not os.path.exists(figs_dir) else None
-                self.fig.savefig(figs_dir + '/state_' + repr(t),
-                        bbox_inches='tight',facecolor='None')
+        #     if self.args.save_figs:
+        #         figs_dir = os.path.join(self.path, 'figures')
+        #         os.mkdir(figs_dir) if not os.path.exists(figs_dir) else None
+        #         self.fig.savefig(figs_dir + '/state_' + repr(t),
+        #                 bbox_inches='tight',facecolor='None')
 
         return cur
 
@@ -204,8 +181,6 @@ class TrajectoryOptimization(Dynamics):
         run = True
         # while eta >= stop_cond:
         while run:
-            self.broadcast_tf()
-
             prev_sample_info = self.backward(sample_info, noisy)
 
             new_sample_info  = self.forward(prev_sample_info, noisy)  
@@ -229,7 +204,7 @@ class TrajectoryOptimization(Dynamics):
                 J_prev_traj = np.sum(prev_traj.cost_info.l_nlnr[:-1] \
                         - prev_traj.cost_info.l_nom[:-1], axis=0) \
                     + prev_traj.cost_info.l_nlnr[-1] \
-                    - prev_traj.cost_info.l_nom[-1] # see DDP Jacobson pg 113
+                    - prev_traj.cost_info.l_nom[-1] # see DDP pg 113
                 
                 J_prev_traj = J_prev_traj.squeeze() if J_prev_traj.ndim > 1 else J_prev_traj
                 #############################################################################
@@ -269,9 +244,10 @@ class TrajectoryOptimization(Dynamics):
                 # ros com params
                 start_time = Duration(secs = 0, nsecs = 0) # start asap
                 duration = Duration(secs = duration_length, nsecs = 0) # apply effort continuously without end duration = -1
-                reference_frame = "world" #'empty/world/map' #"youbot::base_footprint" #
+                reference_frame = None #'empty/world/map' #"youbot::base_footprint" #
 
                 wrench_base = Wrench()
+                base_angle = Twist()
 
                 rospy.loginfo("Found suitable trajectory. Applying found control law")
 
@@ -283,7 +259,6 @@ class TrajectoryOptimization(Dynamics):
                     # calculate the genralized force and torques
                     bdyn = self.assemble_dynamics()
                     theta = bdyn.q[-1]
-                    # theta = new_sample_info.traj_info.delta_state[t][-1] #bdyn.q[-1]
 
                     sign_phi = np.sign(self.Phi_dot)
                     F1 = (torques[0] - self.wheel['radius'] * sign_phi[0] * bdyn.f[0]) * \
@@ -312,23 +287,22 @@ class TrajectoryOptimization(Dynamics):
                     wrench_base.force.y = F2    * scale_factor
                     wrench_base.torque.z = F3   * scale_factor
 
-                    F1 = wrench_base.force.x 
-                    F2 = wrench_base.force.y
-                    F3 = wrench_base.torque.z
+                    # rospy.loginfo('F1: {}, F2: {}, F3: {}'.format(wrench_base.force.x, 
+                    #         wrench_base.force.y, wrench_base.torque.z))
 
-                    rospy.loginfo('F1: {}, F2: {}, F3: {}'.format(F1, F2, F3))
-
-                    # state_change = bdyn.q - self.goal_state
-                    # rospy.loginfo("\nx:\t {}, \nq:\t {}, \nx_bar:\t {}, \ndelx:\t {}".format(
-                    #     new_sample_info.traj_info.state[t,:], bdyn.q, 
-                    #     new_sample_info.traj_info.nominal_state[t,:],
-                    #     new_sample_info.traj_info.delta_state[t,:]))
+                    state_change = bdyn.q - self.goal_state
+                    print('self.goal_state: ', self.goal_state)
+                    rospy.loginfo("\nx:\t {}, \nx_bar:\t {}, \ndelx:\t {}, \nq:\t {}"
+                        ", \ngoal_state:\t {}".format(
+                        new_sample_info.traj_info.state[t,:], new_sample_info.traj_info.nominal_state[t,:],
+                        new_sample_info.traj_info.delta_state[t,:], bdyn.q, 
+                        self.goal_state))
                     # rospy.loginfo('\nu: {}, \nu_bar: {}, \ndelu: {}'.format(
                     #     new_sample_info.traj_info.action[t,:], new_sample_info.traj_info.nominal_action[t,:], 
                     #     new_sample_info.traj_info.delta_action[t,:]))
 
                     # send the torques to the base footprint
-                    # self.pub.publish(base_angle)
+                    self.pub.publish(base_angle)
                     send_body_wrench('base_footprint', reference_frame,
                                                     None, wrench_base, start_time,
                                                     duration )
@@ -346,9 +320,7 @@ class TrajectoryOptimization(Dynamics):
                         break
 
 
-                    rospy.loginfo('Eta: {}, self.l21_const: {}'
-                        .format(abs(gs-cs), self.l21_const))
-                    # rospy.loginfo("goal state: {}".format(self.goal_state))
+                    rospy.loginfo('Eta: {}'.format(abs(gs-cs)))
 
                     if save:
                         with open(savefile, 'ab') as f:
@@ -358,8 +330,7 @@ class TrajectoryOptimization(Dynamics):
                 new_sample_info.traj_info.nominal_state  = new_sample_info.traj_info.state
 
                 if not run :
-                    print("Finished Traj Opt. Returning to home position")
-                    # self.goal_state = np.array([0, 0, 0])
+                    print("Finished Traj Opt")
                     break
 
                 sample_info = new_sample_info 
@@ -430,11 +401,10 @@ class TrajectoryOptimization(Dynamics):
                     # calculate the Qvals that penalize devs from the states
                     cost_info.Qu_tilde[t,:] = cost_info.Qu[t,:] + self.mu * np.ones(dU)
                     cost_info.Quu_tilde[t,:,:] = cost_info.luu[t] + traj_info.fu[t,:].T.dot(\
-                                    cost_info.Vxx[t+1,:,:] + self.mu * np.eye(dX)).dot(traj_info.fu[t,:]) #\
-                                    # + cost_info.Vx[t+1,:].dot(traj_info.fuu[t,:,:])
+                                    cost_info.Vxx[t+1,:,:] + self.mu * np.eye(dX)).dot(traj_info.fu[t,:])
                     cost_info.Qux_tilde[t,:,:] = cost_info.lux[t] + traj_info.fu[t,:].T.dot(\
-                                    cost_info.Vxx[t+1,:,:] + self.mu * np.eye(dX)).dot(traj_info.fx[t,:]) #\
-                                    # + traj_info.fux[t,:,:].dot(cost_info.Vx[t+1,:])
+                                    cost_info.Vxx[t+1,:,:] + self.mu * np.eye(dX)).dot(traj_info.fx[t,:]) #+ \
+                                    #traj_info.fux[t,:,:].dot(cost_info.Vx[t+1,:])
 
                 # symmetrize the second order moments of Q
                 cost_info.Quu[t,:,:] = 0.5 * (cost_info.Quu[t].T + cost_info.Quu[t])
@@ -535,10 +505,7 @@ class TrajectoryOptimization(Dynamics):
             traj_info.delta_action[t,:] = traj_info.delta_action[t,:] \
                                                 + alpha * traj_info.gu[t, :] \
                                                 + traj_info.Gu[t, :].dot(traj_info.delta_state[t,:])
-            # update the states and controls
-            traj_info.nominal_state[t,:] = traj_info.state[t,:]
-            traj_info.action[t,:] = traj_info.nominal_action[t,:]
-
+           
         prev_sample_info.traj_info = traj_info
         # prev_sample_info.cost_info = cost_info
 
@@ -576,7 +543,7 @@ if __name__ == '__main__':
             # on first iteration, obtain trajectory samples from the robot
             sample_info = trajopt.get_traj_cost_info(noisy=False)
             stop_cond = hyperparams.config['agent']['TOL']
-            trajopt.do_traj_opt(sample_info, stop_cond, save=False)
+            trajopt.do_traj_opt(sample_info, stop_cond, save=True)
 
 
     except KeyboardInterrupt:

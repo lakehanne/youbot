@@ -228,7 +228,7 @@ class Dynamics(MassMaker):
 
         _, _, robot_angle = euler_from_quaternion(self.boxtacle_pose[3:])
         self.goal_state  = np.array(self.boxtacle_pose[:2] + [robot_angle])
-        self.goal_state[0] -= 0.3 # account for box origin so robot doesn't push box
+        self.goal_state[0] -= 0.4 # account for box origin so robot doesn't push box
 
         # see generalized ILQG Summary page
         k = range(0, T)
