@@ -9,7 +9,8 @@ import threading
 import numpy as np
 from PIL import Image
 from scripts.algorithm_utils import Alex2D
-from scripts.subscribers import KinectReceiver
+from scripts.subscribers import KinectReceiver, \
+								ModelStatesReceiver
 
 import sys
 import torch
@@ -33,9 +34,12 @@ if use_cuda:
 class ProcessObservations(object):
 	def __init__(self, rate=30, verbose=False, test=False):
 		super(ProcessObservations, self).__init__()
-		self.kr = KinectReceiver(verbose)
 		self.verbose = verbose
 		self.rate = rate
+
+		self.kinect_rcvr = KinectReceiver(verbose)
+		self.model_rcvr = ModelStatesReceiver()
+
 
 		self.net = Alex2D()
 
@@ -86,8 +90,44 @@ class ProcessObservations(object):
 			LOGGER.critical('type of array not understood')
 		return square_image
 
+	def neatify_model_states(self, model_states):
+
+		pose = model_states.pose
+		twist = model_states.twist
+
+		# world_pose = [pose[1].position.x, pose[1].position.y, pose[1].position.z,
+		# 				pose[1].orientation.x, pose[1].orientation.y, pose[1].orientation.z,
+		# 				pose[1].orientation.w]
+		# world_twist = [twist[1].linear.x, twist[1].linear.y, twist[1].linear.z,
+		# 				twist[1].angular.x, twist[1].angular.y, twist[1].angular.z]
+
+		youbot_pose = [pose[-2].position.x, pose[-2].position.y, pose[-2].position.z,
+						pose[-2].orientation.x, pose[-2].orientation.y, pose[-2].orientation.z,
+						pose[-2].orientation.w]
+		youbot_twist = [twist[-2].linear.x, twist[-2].linear.y, twist[-2].linear.z,
+						twist[-2].angular.x, twist[-2].angular.y, twist[-2].angular.z]
+
+		boxtacle_pose = [pose[-1].position.x, pose[-1].position.y, pose[-1].position.z,
+						 pose[-1].orientation.x, pose[-1].orientation.y, pose[-1].orientation.z,
+						 pose[-1].orientation.w]
+		boxtacle_twist = [twist[-1].linear.x, twist[-1].linear.y, twist[-1].linear.z,
+						twist[-1].angular.x, twist[-1].angular.y, twist[-1].angular.z]					
+
+		# world = world_pose + world_twist
+		youbot = youbot_pose + youbot_twist
+		boxtacle = boxtacle_pose + boxtacle_twist
+
+		# print(world)
+		print(youbot)
+		print(boxtacle)
+
+
 	def convolve_rgb(self):
-		image = self.kr.rgb_img
+		# first gather robot model states
+		image = self.kinect_rcvr.rgb_img
+		model_states = self.model_rcvr.model_states
+
+		model_states_list = self.neatify_model_states(model_states)
 
 		#### Feature detectors using CV2 #### 
 		# "","Grid","Pyramid" + 

@@ -15,7 +15,7 @@ class Alex2D(nn.Module):
 		self.num_channels = channels
 
 		self.conv_features = nn.Sequential(
-			nn.Conv2d(self.num_channels, 240, kernel_size=7, stride=[2], padding=0),
+			nn.Conv2d(self.num_channels, 240, kernel_size=7, stride=2, padding=0),
 			nn.ReLU(inplace=True),
 			# nn.MaxPool2d(kernel_size=3, stride=2),
 			nn.Conv2d(64, 117, kernel_size=5, stride=2, padding=0),

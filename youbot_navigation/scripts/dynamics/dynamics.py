@@ -13,6 +13,8 @@ from collections import namedtuple
 from scripts.dynamics.constants import MassMaker
 from scripts.algorithm_utils import TrajectoryInfo, \
                             generate_noise, CostInfo
+from scripts.subscribers import KinectReceiver, \
+                                ModelStatesReceiver
 
 from multiprocessing.pool import ThreadPool
 from geometry_msgs.msg import Twist, \
@@ -43,9 +45,10 @@ class Dynamics(MassMaker):
         self.T                = config['agent']['T']
         self.dU               = config['agent']['dU']
         self.dX               = config['agent']['dX']
-        self.goal_state       = config['agent']['goal_state']
+        self.goal_state       = None #config['agent']['goal_state']
 
         self.__dict__.update(mat_maker.__dict__)
+        self.model_rcvr       = ModelStatesReceiver()
         num_samples = config['agent']['sample_length']
 
     def odom_cb(self, odom):
@@ -93,8 +96,8 @@ class Dynamics(MassMaker):
         # quaternion = [self.odom.pose.pose.orientation.w, self.odom.pose.pose.orientation.x,
         #                 self.odom.pose.pose.orientation.y,self.odom.pose.pose.orientation.z] 
         # see https://answers.ros.org/question/69754/quaternion-transformations-in-python/      
-        quaternion = [self.odom.pose.pose.orientation.w, self.odom.pose.pose.orientation.x,
-                        self.odom.pose.pose.orientation.y, self.odom.pose.pose.orientation.z]
+        quaternion = [self.odom.pose.pose.orientation.x, self.odom.pose.pose.orientation.y,
+                        self.odom.pose.pose.orientation.z, self.odom.pose.pose.orientation.w]
         _, _, theta = euler_from_quaternion(quaternion, axes='sxyz')
         # theta -= np.pi/2.0  # account for diffs of frames in gazebo and paper
 
@@ -198,6 +201,34 @@ class Dynamics(MassMaker):
 
         traj_info =  TrajectoryInfo(config)
         cost_info =  CostInfo(config)
+
+        model_states = self.model_rcvr.model_states
+
+        pose = model_states.pose
+        # print('pose: ', pose)
+        # twist = model_states.twist
+
+        # world_pose  = [pose[1].position.x, pose[1].position.y, pose[1].position.z,
+        #                 pose[1].orientation.x, pose[1].orientation.y, pose[1].orientation.z,
+        #                 pose[1].orientation.w]
+        # world_twist = [twist[1].linear.x, twist[1].linear.y, twist[1].linear.z,
+        #                 twist[1].angular.x, twist[1].angular.y, twist[1].angular.z]
+
+        # youbot_pose = [pose[2].position.x, pose[2].position.y, pose[2].position.z,
+        #                 pose[2].orientation.x, pose[2].orientation.y, pose[2].orientation.z,
+        #                 pose[2].orientation.w]
+        # youbot_twist= [twist[2].linear.x, twist[2].linear.y, twist[2].linear.z,
+        #                 twist[2].angular.x, twist[2].angular.y, twist[2].angular.z]
+
+        self.boxtacle_pose  = [pose[-1].position.x, pose[-1].position.y, pose[-1].position.z,
+                         pose[-1].orientation.x, pose[-1].orientation.y, pose[-1].orientation.z,
+                         pose[-1].orientation.w]
+        # boxtacle_twist = [twist[3].linear.x, twist[3].linear.y, twist[3].linear.z,
+        #                 twist[3].angular.x, twist[3].angular.y, twist[3].angular.z]                 
+
+        _, _, robot_angle = euler_from_quaternion(self.boxtacle_pose[3:])
+        self.goal_state  = np.array(self.boxtacle_pose[:2] + [robot_angle])
+        self.goal_state[0] -= 0.3 # account for box origin so robot doesn't push box
 
         # see generalized ILQG Summary page
         k = range(0, T)
