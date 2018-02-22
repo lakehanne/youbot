@@ -15,7 +15,6 @@ from scripts.algorithm_utils import TrajectoryInfo, \
                             generate_noise, CostInfo
 from scripts.subscribers import KinectReceiver, \
                                 ModelStatesReceiver
-from scripts.costs import CostSum, CostAction, CostState                              
 
 from multiprocessing.pool import ThreadPool
 from geometry_msgs.msg import Twist, \
@@ -51,8 +50,6 @@ class Dynamics(MassMaker):
         self.__dict__.update(mat_maker.__dict__)
         self.model_rcvr       = ModelStatesReceiver()
         num_samples = config['agent']['sample_length']
-
-        # self.costs = config['all_costs']['costs']['type'](config['all_costs']['costs'])
 
     def odom_cb(self, odom):
         self.odom = odom
@@ -101,7 +98,7 @@ class Dynamics(MassMaker):
         # see https://answers.ros.org/question/69754/quaternion-transformations-in-python/      
         quaternion = [self.odom.pose.pose.orientation.x, self.odom.pose.pose.orientation.y,
                         self.odom.pose.pose.orientation.z, self.odom.pose.pose.orientation.w]
-        _, _, theta,  = euler_from_quaternion(quaternion, axes='sxyz')
+        _, _, theta = euler_from_quaternion(quaternion, axes='sxyz')
         # theta -= np.pi/2.0  # account for diffs of frames in gazebo and paper
 
         xdot = self.odom.twist.twist.linear.x
@@ -205,8 +202,6 @@ class Dynamics(MassMaker):
         traj_info =  TrajectoryInfo(config)
         cost_info =  CostInfo(config)
 
-        cost_sum = CostSum(config)  # note that config is global to scope
-
         model_states = self.model_rcvr.model_states
 
         pose = model_states.pose
@@ -225,21 +220,23 @@ class Dynamics(MassMaker):
         # youbot_twist= [twist[2].linear.x, twist[2].linear.y, twist[2].linear.z,
         #                 twist[2].angular.x, twist[2].angular.y, twist[2].angular.z]
 
-        self.boxtacle_pose  = [pose[-1].position.y, pose[-1].position.x, pose[-1].position.z,
-                         pose[-1].orientation.y, pose[-1].orientation.x, pose[-1].orientation.z,
+        self.boxtacle_pose  = [pose[-1].position.x, pose[-1].position.y, pose[-1].position.z,
+                         pose[-1].orientation.x, pose[-1].orientation.y, pose[-1].orientation.z,
                          pose[-1].orientation.w]
         # boxtacle_twist = [twist[3].linear.x, twist[3].linear.y, twist[3].linear.z,
         #                 twist[3].angular.x, twist[3].angular.y, twist[3].angular.z]                 
 
-        robot_angle, _, _, = euler_from_quaternion(self.boxtacle_pose[3:])
+        _, _, robot_angle = euler_from_quaternion(self.boxtacle_pose[3:])
         self.goal_state  = np.array(self.boxtacle_pose[:2] + [robot_angle])
-        self.goal_state[0] -= 0.456 # account for box origin so robot doesn't push box when we get to final time step
+        self.goal_state[0] -= 0.4 # account for box origin so robot doesn't push box
 
         # see generalized ILQG Summary page
         k = range(0, T)
         K = len(k)
         delta_t = T/(K-1)
         t = [(_+1-1)*delta_t for _ in k]
+
+        # for n in range(N):
 
         # allocate space for local controls
         u       = np.zeros((T, dU))
@@ -318,34 +315,61 @@ class Dynamics(MassMaker):
             delta_u[k,:]     = u[k,:] - u_bar[k,:]
             delta_x_star     = self.goal_state
 
-            # get neighboring state and costs 
-            l[k], lx[k], lu[k], \
-            lux[k], lxx[k],  \
-            luu[k]  = cost_sum.eval(x=delta_x[k,:], \
-                                    xstar=delta_x_star, \
-                                    u=delta_u[k,:], \
-                                    l21_const=self.l21_const, \
-                                    state_penalty=self.state_penalty, \
-                                    action_penalty=self.action_penalty)
+            # calculate cost-to-go and derivatives of nlnr stage_cost
+            u_exp = self.expand_array(u[k,:], 1)
+            x_exp = self.expand_array(x[k,:]-delta_x_star, 1)         
+            cost_action_nlnr_term = 0.5 * self.action_penalty[0] * u_exp.T.dot(u_exp)
+            cost_state_nlnr_term  = 0.5 * self.state_penalty[0]  * x_exp.T.dot(x_exp)
+            cost_l12_nlnr_term    = np.sqrt(self.l21_const + (x_exp - delta_x_star).T.dot(x_exp - delta_x_star))
 
-            # print('l: {} \nlx: {}, \nlu: {}, \nlux: {}, \nlxx: {}, \nluu: {}'
-            #         .format(l[k], lx[k], lu[k], lux[k], lxx[k], luu[k]))                 
-            # get nominal state costs 
-            l_nom[k] = cost_sum.eval(x=x_bar[k,:], \
-                                    xstar=delta_x_star, \
-                                    u=u_bar[k,:], \
-                                    l21_const=self.l21_const, \
-                                    state_penalty=self.state_penalty, \
-                                    action_penalty=self.action_penalty)[0]
+            # calculate cost-to-go and derivatives of stage_cost
+            delu_exp = self.expand_array(delta_u[k,:], 1)
+            delx_exp = self.expand_array(delta_x[k,:]-delta_x_star, 1)
+            cost_action_term = 0.5 * self.action_penalty[0] * delu_exp.T.dot(delu_exp)
+            cost_state_term  = 0.5 * self.state_penalty[0]  * delx_exp.T.dot(delx_exp)
+            cost_l12_term    = np.sqrt(self.l21_const + (delx_exp - delta_x_star).T.dot(\
+                                delx_exp - delta_x_star))
 
-            # get nonlinear state costs 
-            l_nlnr[k] = cost_sum.eval(x=x[k,:], \
-                                    xstar=delta_x_star, \
-                                    u=u[k,:], \
-                                    l21_const=self.l21_const, \
-                                    state_penalty=self.state_penalty, \
-                                    action_penalty=self.action_penalty)[0]
 
+            # nominal cost terms
+            ubar_exp = self.expand_array(u_bar[k,:], 1)
+            xbar_exp = self.expand_array(x_bar[k,:] - delta_x_star, 1)
+            cost_nom_action_term = 0.5 * self.action_penalty[0] * ubar_exp.T.dot(ubar_exp)
+            cost_nom_state_term  = 0.5 * self.state_penalty[0] * xbar_exp.T.dot(xbar_exp)
+            cost_nom_l12_term   = np.sqrt(self.l21_const + (xbar_exp \
+                                    - delta_x_star).T.dot(xbar_exp \
+                                    - delta_x_star))
+            # cost_nom_l12_term    = np.sqrt(self.l21_const + self.expand_array((x_bar[k,:] - delta_x_star), 1).T.dot(self.expand_array((x_bar[k,:] - delta_x_star), 1))
+
+            # define lx/lxx cost costants
+            final_state_diff = (x[k,:] - self.goal_state)
+            sqrt_term        = np.sqrt(self.l21_const + self.expand_array(final_state_diff, 1).T.dot(self.expand_array(final_state_diff, 1)))
+
+
+            #system cost
+            l[k]       = cost_action_term[0][0] + cost_state_term[0][0] + cost_l12_term[0][0]
+            l_nom[k]   = cost_nom_action_term[0][0] + cost_nom_state_term[0][0] + cost_nom_l12_term[0][0]
+            l_nlnr[k]  = cost_action_nlnr_term[0][0] + cost_state_nlnr_term[0][0] + cost_l12_nlnr_term[0][0]
+            
+            # first order cost terms
+            lu[k] = self.action_penalty[0] * delta_u[k,:]
+            lx[k] = self.state_penalty[0] * delx_exp.squeeze() \
+                    + (final_state_diff/np.sqrt(self.l21_const + final_state_diff**2))
+
+            # 2nd order cost terms
+            luu[k]     = np.diag(self.action_penalty)
+            lux[k]     = np.zeros((self.dU, self.dX))
+
+            lxx_t1  = np.diag(self.state_penalty)
+            lxx_t2_top = sqrt_term - (final_state_diff**2) /sqrt_term
+            lxx_t2_bot = self.l21_const + (final_state_diff**2)
+
+            lxx[k]        = lxx_t1 + lxx_t2_top/lxx_t2_bot
+            # lxx[k]     = np.diag(self.state_penalty)
+
+            # squeeze dims of first order derivatives
+            lx[k] = lx[k].squeeze() if lx[k].ndim > 1 else lx[k]
+            lu[k] = lu[k].squeeze() if lu[k].ndim > 1 else lu[k]
 
             # store away stage terms
             traj_info.fx[k,:]            = fx[k,:]

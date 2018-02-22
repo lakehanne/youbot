@@ -9,19 +9,15 @@ import imp
 import time
 import copy
 import rospy
+import rospkg
 import roslib
 import logging
 import argparse
 import threading
 import numpy as np
 import scipy as sp
-# import pathos.pools as pp
-
-import rospkg
 from rospy.rostime import Duration
-
 from geometry_msgs.msg import Wrench, Twist
-
 # import torque and wrench services
 from scripts.services import send_joint_torques, clear_active_forces, \
                              send_body_wrench, clear_active_wrenches
@@ -99,7 +95,6 @@ class TrajectoryOptimization(Dynamics):
 
         rp = rospkg.RosPack()
         self.path = rp.get_path('youbot_navigation')
-        self.pub  = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
 
         # mpl params
         plt.ioff()
@@ -258,42 +253,35 @@ class TrajectoryOptimization(Dynamics):
 
                     # calculate the genralized force and torques
                     bdyn = self.assemble_dynamics()
-                    theta = bdyn.q[-1]
+                    theta = bdyn.q[-1] #torques[-1]  #
 
                     sign_phi = np.sign(self.Phi_dot)
-                    F1 = (torques[0] - self.wheel['radius'] * sign_phi[0] * bdyn.f[0]) * \
-                            (-(np.cos(theta) - np.sin(theta))/self.wheel['radius']) + \
-                         (torques[1] - self.wheel['radius'] * sign_phi[1] * bdyn.f[0]) * \
-                            (-(np.cos(theta) + np.sin(theta))/self.wheel['radius'])  + \
-                         (torques[2] - self.wheel['radius'] * sign_phi[2] * bdyn.f[0]) * \
-                            ((np.cos(theta) - np.sin(theta))/self.wheel['radius'])  + \
-                         (torques[3] - self.wheel['radius'] * sign_phi[3] * bdyn.f[0]) * \
-                            ((np.cos(theta) + np.sin(theta))/self.wheel['radius'])
-                    F2 = (torques[0] - self.wheel['radius'] * sign_phi[0] * bdyn.f[0]) * \
-                            (-(np.cos(theta) + np.sin(theta))/self.wheel['radius']) + \
-                         (torques[1] - self.wheel['radius'] * sign_phi[1] * bdyn.f[0]) * \
-                            (-(-np.cos(theta) + np.sin(theta))/self.wheel['radius'])  + \
-                         (torques[2] - self.wheel['radius'] * sign_phi[2] * bdyn.f[0]) * \
-                            ((np.cos(theta) + np.sin(theta))/self.wheel['radius'])  + \
-                         (torques[3] - self.wheel['radius'] * sign_phi[3] * bdyn.f[0]) * \
-                            ((-np.cos(theta) + np.sin(theta))/self.wheel['radius'])
-                    F3 = np.sum(torques) * (-np.sqrt(2)*self.l * np.sin( np.pi/4 - self.alpha)/self.wheel['radius'])  \
-                           + (sign_phi[0] * bdyn.f[0] + sign_phi[1] * bdyn.f[0] + sign_phi[2] * bdyn.f[0] + sign_phi[3] * bdyn.f[0]) \
-                                * (np.sqrt(2)* self.l * np.sin(np.pi/4 - self.alpha))
+                    # see me notes
+                    left_mult = torques - self.wheel['radius'] * np.sign(self.Phi_dot) * bdyn.f
 
-                    scale_factor = 0.28
+                    right_mult = np.zeros((4, 3))
+                    right_mult[:,-1].fill(self.l*np.sin(np.pi/4 - self.alpha))
+                    right_mult[:,:2].fill( (np.cos(theta) + np.sin(theta))/self.wheel['radius'] )
+                    right_mult[0,0] = -(np.cos(theta) - np.sin(theta))/self.wheel['radius']
+                    right_mult[1,1] = -(np.cos(theta) - np.sin(theta))/self.wheel['radius']
+                    right_mult[2,0] =  (np.cos(theta) - np.sin(theta))/self.wheel['radius']
+                    right_mult[3,1] =  (np.cos(theta) - np.sin(theta))/self.wheel['radius']
 
-                    wrench_base.force.x = F1    * scale_factor
-                    wrench_base.force.y = F2    * scale_factor
-                    wrench_base.torque.z = F3   * scale_factor
+                    forces = left_mult.dot(right_mult)
 
-                    # rospy.loginfo('F1: {}, F2: {}, F3: {}'.format(wrench_base.force.x, 
-                    #         wrench_base.force.y, wrench_base.torque.z))
+                    scale_factor = 2
+
+                    wrench_base.force.x =  forces[0] * scale_factor
+                    wrench_base.force.y =  forces[1] * scale_factor
+                    wrench_base.torque.z = forces[2] * scale_factor
+
+                    rospy.loginfo('F1: {}, F2: {}, F3: {}'.format(wrench_base.force.x, 
+                            wrench_base.force.y, wrench_base.torque.z))
 
                     state_change = bdyn.q - self.goal_state
                     print('self.goal_state: ', self.goal_state)
                     rospy.loginfo("\nx:\t {}, \nx_bar:\t {}, \ndelx:\t {}, \nq:\t {}"
-                        ", \ngoal_state:\t {}".format(
+                        ", \nq*:\t {}".format(
                         new_sample_info.traj_info.state[t,:], new_sample_info.traj_info.nominal_state[t,:],
                         new_sample_info.traj_info.delta_state[t,:], bdyn.q, 
                         self.goal_state))
@@ -302,7 +290,6 @@ class TrajectoryOptimization(Dynamics):
                     #     new_sample_info.traj_info.delta_action[t,:]))
 
                     # send the torques to the base footprint
-                    self.pub.publish(base_angle)
                     send_body_wrench('base_footprint', reference_frame,
                                                     None, wrench_base, start_time,
                                                     duration )
@@ -314,7 +301,8 @@ class TrajectoryOptimization(Dynamics):
                     gs = np.linalg.norm(self.goal_state)
                     cs = np.linalg.norm(bdyn.q)
                     if np.allclose(gs, cs, rtol=0, atol=stop_cond):
-                        rospy.loginfo("Met stopping criterion. Robot reached goal state")
+                    # if np.all(state_change < stop_cond):
+                        rospy.loginfo("Reached goal state. Terminating.")
                         # eta = stop_cond
                         run = False
                         break
