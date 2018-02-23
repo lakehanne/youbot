@@ -30,12 +30,16 @@ from scripts.dynamics import Dynamics
 from scripts.sample import SampleList
 from scripts.algorithm_utils import IterationData, TrajectoryInfo, \
                             generate_noise, CostInfo
+from scripts.subscribers import PointCloudsReceiver
 
 from multiprocessing import Pool, Process
 
 import matplotlib as mpl
 mpl.use('QT4Agg')
 import matplotlib.pyplot as plt
+
+from sensor_msgs.msg import PointCloud2
+import sensor_msgs.point_cloud2 as pcl2
 
 # fix seed
 np.random.seed(0)
@@ -102,6 +106,8 @@ class TrajectoryOptimization(Dynamics):
         self._ax = self.fig.gca()
         self.linesearch_param = 1 # this is alpha in synthesis paper
         self.first_iteration = False
+
+        self.pcl_rcvr = PointCloudsReceiver(rate)
 
     def get_state_rhs_eq(bdyn, x, u):
         M, C, B, S, f = bdyn.M, bdyn.C, bdyn.B, bdyn.S, bdyn.f
@@ -172,6 +178,9 @@ class TrajectoryOptimization(Dynamics):
         c_zero = self.config['trajectory']['c_zero']
 
         tic    = time.time()
+        
+        wrench_base = Wrench()
+        base_angle = Twist()
 
         run = True
         # while eta >= stop_cond:
@@ -241,9 +250,6 @@ class TrajectoryOptimization(Dynamics):
                 duration = Duration(secs = duration_length, nsecs = 0) # apply effort continuously without end duration = -1
                 reference_frame = None #'empty/world/map' #"youbot::base_footprint" #
 
-                wrench_base = Wrench()
-                base_angle = Twist()
-
                 rospy.loginfo("Found suitable trajectory. Applying found control law")
 
                 for t in range(T):
@@ -256,33 +262,27 @@ class TrajectoryOptimization(Dynamics):
                     theta = bdyn.q[-1] #torques[-1]  #
 
                     sign_phi = np.sign(self.Phi_dot)
+
                     # see me notes
                     # F = (1/r) * B^T \tau - B^T S f
                     forces = (1/self.wheel['radius']) * bdyn.B.T.dot(torques) \
                                 - bdyn.B.T.dot(bdyn.S.dot(bdyn.f))
-                    # left_mult = torques - self.wheel['radius'] * np.sign(self.Phi_dot) * bdyn.f
+                    # get laser readeings
+                    self.pcl_rcvr.laser_listener()
+                    # print('points: {}, pts len: {}'.format(self.pcl_rcvr.points, len(self.pcl_rcvr.points)))
+                    #  reset points
+                    self.pcl_rcvr.points = []
+                    scale_factor = 3
 
-                    # right_mult = np.zeros((4, 3))
-                    # right_mult[:,-1].fill(self.l*np.sin(np.pi/4 - self.alpha))
-                    # right_mult[:,:2].fill( (np.cos(theta) + np.sin(theta))/self.wheel['radius'] )
-                    # right_mult[0,0] = -(np.cos(theta) - np.sin(theta))/self.wheel['radius']
-                    # right_mult[1,1] = -(np.cos(theta) - np.sin(theta))/self.wheel['radius']
-                    # right_mult[2,0] =  (np.cos(theta) - np.sin(theta))/self.wheel['radius']
-                    # right_mult[3,1] =  (np.cos(theta) - np.sin(theta))/self.wheel['radius']
-
-                    # forces = left_mult.dot(right_mult)
-
-                    scale_factor = 2
-
-                    wrench_base.force.x =  forces[0] * scale_factor
+                    wrench_base.force.x =  forces[0] * 1.5k
                     wrench_base.force.y =  forces[1] * scale_factor
-                    wrench_base.torque.z = forces[2] * scale_factor
+                    wrench_base.torque.x = forces[2] * scale_factor
 
-                    rospy.loginfo('F1: {}, F2: {}, F3: {}'.format(wrench_base.force.x, 
-                            wrench_base.force.y, wrench_base.torque.z))
+                    rospy.loginfo('\nFx: {}, Fy: {}, Fteta: {}'.format(wrench_base.force.x, 
+                            wrench_base.force.y, wrench_base.torque.x))
 
                     state_change = bdyn.q - self.goal_state
-                    print('self.goal_state: ', self.goal_state)
+                    # print('self.goal_state: ', self.goal_state)
                     rospy.loginfo("\nx:\t {}, \nx_bar:\t {}, \ndelx:\t {}, \nq:\t {}"
                         ", \nq*:\t {}".format(
                         new_sample_info.traj_info.state[t,:], new_sample_info.traj_info.nominal_state[t,:],

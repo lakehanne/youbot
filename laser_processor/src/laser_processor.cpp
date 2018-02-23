@@ -45,7 +45,6 @@ public:
   boost::shared_ptr<pcl::visualization::PCLVisualizer> viewerCreator();
   void keyboardEventOccurred (const pcl::visualization::KeyboardEvent &event,
                               void* viewer_void);
-
   //high fidelity projection
   void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg )
   {
@@ -57,7 +56,7 @@ public:
        return;
     }
 
-    pub = n_laser_.advertise<PointCloudT>("laser_cloud", 20);
+    pub = n_laser_.advertise<PointCloudT>("laser_cloud", 4);
 
     sensor_msgs::PointCloud cloud;
     PointCloudT::Ptr cloud_msg (new (PointCloudT)); // for publishing
@@ -70,18 +69,19 @@ public:
     readCloud(cloud, pclCloud, cloud_msg);    
     ros::Rate looper(30);
 
-    if(ros::ok() && !viewer->wasStopped())
+    // if(ros::ok() && !viewer->wasStopped())
+    if(ros::ok())
     {            
-      viewer->setSize(400, 400);
-      viewer->addPointCloud<pcl::PointXYZ> (this->pclCloud, "laser_cloud");     
-      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "laser_cloud"); 
-      viewer->spinOnce(10);
-      boost::this_thread::sleep(boost::posix_time::microseconds(100));
+      // viewer->setSize(400, 400);
+      // viewer->addPointCloud<pcl::PointXYZ> (this->pclCloud, "laser_cloud");     
+      // viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "laser_cloud"); 
+      // viewer->spinOnce(10);
+      // boost::this_thread::sleep(boost::posix_time::microseconds(100));
 
       if(updateCloud)
       {      
-        viewer->removePointCloud("laser_cloud");
-        viewer->updatePointCloud(this->pclCloud, "laser_cloud");
+        // viewer->removePointCloud("laser_cloud");
+        // viewer->updatePointCloud(this->pclCloud, "laser_cloud");
         pub.publish(cloud_msg);
       }
       looper.sleep();
@@ -90,7 +90,7 @@ public:
     updateCloud = true;
   }
 
-  void readCloud(const sensor_msgs::PointCloud sensorCloud, pcl::PointCloud<pcl::PointXYZ>::Ptr pclCloud, PointCloudT::Ptr cloud_msg)
+  void readCloud(const sensor_msgs::PointCloud& sensorCloud, pcl::PointCloud<pcl::PointXYZ>::Ptr pclCloud, PointCloudT::Ptr cloud_msg)
   {
     pcl::PointXYZ points;
 
@@ -112,16 +112,16 @@ public:
 
 laser_clouds::laser_clouds(ros::NodeHandle n_laser, bool spill)
   : updateCloud(false), n_laser_(n_laser), spill(spill){
-    viewer = laser_clouds::viewerCreator();
+    // viewer = laser_clouds::viewerCreator();
     pub = n_laser_.advertise<PointCloudT>("laser_cloud", 1);
   }
 
 boost::shared_ptr<pcl::visualization::PCLVisualizer> laser_clouds::viewerCreator()
 {    
   boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("Laser Scans 2D"));
+  viewer->setSize(400, 400);
   viewer->setBackgroundColor  (0.2, 0.3, 0.3);
   viewer->addCoordinateSystem (1.0);    //don't want me no cylinder
-  viewer->setSize(400, 400);
   viewer->initCameraParameters ();
   viewer->registerKeyboardCallback (&laser_clouds::keyboardEventOccurred, *this);
   return viewer;

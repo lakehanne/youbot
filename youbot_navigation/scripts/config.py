@@ -24,7 +24,7 @@ config = {
 	'agent': {
 		'goal_state': np.asarray([1.3, 0.8, -2.752012201858897e-19]).T,
 		# 'goal_state': np.asarray([0.82452343,  0.59753333,  0.07282408]).T,
-		'T':  40,
+		'T':  80,
 		'dU': 4,
 		'dV': 4,
 		'dX': 3, # includes velocity terms

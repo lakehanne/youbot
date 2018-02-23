@@ -34,20 +34,28 @@ class CostState(Cost):
         lux           = np.zeros((dU, dX))
         luu           = np.zeros((dU, dU))
 
-        # stage_term    = 0.5 * LA.norm(state_penalty * x)**2
-        # l1l2_term     = xs_exp.T.dot(xs_exp)
-        # l             = stage_term + l1l2_term
-        # lx            = state_penalty * x + 2*state_diff 
-        # lxx           = np.diag(state_penalty) + 2.0 * np.eye(dX)
+        stage_term    = 0.5 * np.expand_dims(state_penalty*x, axis=1)\
+                        .T.dot(np.expand_dims(state_penalty*x, axis=1))
+        l1l2_term     = np.sqrt(l21_const + xs_exp.T.dot(xs_exp))
 
-        stage_term    = 0.5 * LA.norm(state_penalty * x)**2
-        l1l2_term     = np.sqrt(l21_const +   xs_exp.T.dot(xs_exp))
         l             = stage_term + l1l2_term
-        lx            = state_penalty * x + state_diff/(l1l2_term) 
+        lx            = state_penalty * x + state_diff /(l1l2_term)
+
+        # lxx_t1        = l21_const
+        # lxx_t2_top    = np.diag(state_penalty) * l1l2_term ** 3 
+        # lxx_t2_bot    = l1l2_term**3
+        # lxx           = (lxx_t1 + lxx_t2_top)/lxx_t2_bot
+
+        # lxx           = (l21_const + state_penalty * l1l2_term)/(l1l2_term)
+        # stage_term    = 0.5 * LA.norm(state_penalty * x)**2
+        # l1l2_term     = np.sqrt(l21_const +   xs_exp.T.dot(xs_exp))
+        # l             = stage_term + l1l2_term
+        # lx            = state_penalty * x + state_diff/(l1l2_term) 
         lxx_t1        = np.diag(state_penalty)
         lxx_t2_top    = l1l2_term - (state_diff**2) / l1l2_term
         lxx_t2_bot    = state_diff**2
         lxx_t2        = lxx_t2_top / lxx_t2_bot
         lxx           = lxx_t1 + np.diag(lxx_t2.squeeze())
+        # print('lxx: ', lxx, '\n', 'lx: ', lx)
 
         return l, lx, lu, lux, lxx,  luu
