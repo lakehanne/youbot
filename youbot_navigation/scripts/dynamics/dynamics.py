@@ -101,7 +101,7 @@ class Dynamics(MassMaker):
         # see https://answers.ros.org/question/69754/quaternion-transformations-in-python/      
         quaternion = [self.odom.pose.pose.orientation.x, self.odom.pose.pose.orientation.y,
                         self.odom.pose.pose.orientation.z, self.odom.pose.pose.orientation.w]
-        _, _, theta,  = euler_from_quaternion(quaternion, axes='sxyz')
+        theta,_,_  = euler_from_quaternion(quaternion, axes='sxyz')
         # theta -= np.pi/2.0  # account for diffs of frames in gazebo and paper
 
         xdot = self.odom.twist.twist.linear.x
@@ -132,8 +132,8 @@ class Dynamics(MassMaker):
         B[2,0] = np.cos(theta) - np.sin(theta)
 
         B[0,1] *= -1.0
-        B[1,1] = B[2,0]
-        B[3,1] = B[0,0]
+        B[1,1] = np.cos(theta) - np.sin(theta)
+        B[3,1] = np.sin(theta) - np.cos(theta)
 
         xaccel = xdot/time_delta
         yaccel = ydot/time_delta
@@ -154,28 +154,28 @@ class Dynamics(MassMaker):
         # calculate phi dor from eq 6
         Phi_coeff = -(np.sqrt(2)/r)
         # mid matrix
-        Phi_left_mat = np.ones((4, 3))
-        Phi_left_mat[:,:2].fill(np.sqrt(2)/2)
-        Phi_left_mat[:,2].fill(l*np.sin(np.pi/4 - alpha))
+        Phi_left = np.ones((4, 3))
+        Phi_left[:,:2].fill(np.sqrt(2)/2)
+        Phi_left[:,2].fill(l*np.sin(np.pi/4 - alpha))
         # column 0
-        Phi_left_mat[2, 0] *= -1
-        Phi_left_mat[3, 0] *= -1
+        Phi_left[1, 0] *= -1
+        Phi_left[2, 0] *= -1
         # column 1
-        Phi_left_mat[1, 1] *= -1
-        Phi_left_mat[2, 1] *= -1
+        Phi_left[2, 1] *= -1
+        Phi_left[3, 1] *= -1
 
-        Phi_right_mat = np.zeros((3,3))
-        Phi_right_mat[0,0] = np.cos(theta)
-        Phi_right_mat[1,1] = np.cos(theta)
+        Phi_right = np.zeros((3,3))
+        Phi_right[0,0] = -np.sin(theta)
+        Phi_right[1,1] = np.sin(theta)
 
-        Phi_right_mat[0,1] = np.sin(theta)
-        Phi_right_mat[1,0] = -np.sin(theta)
-        Phi_right_mat[2,2] = 1
+        Phi_right[0,1] = np.cos(theta)
+        Phi_right[1,0] = np.cos(theta)
+        Phi_right[2,2] = 1
 
-        Phi_right_vector   = np.asarray([xdot, ydot, theta_dot])
+        zeta               = np.asarray([xdot, ydot, theta_dot])
 
         # assemble Phi vector  --> will be 4 x 1
-        Phi_dot = Phi_coeff * Phi_left_mat.dot(Phi_right_mat).dot(Phi_right_vector)
+        Phi_dot = Phi_coeff * Phi_left.dot(Phi_right).dot(zeta)
 
         # store away future variables dot
         self.Phi_dot = Phi_dot

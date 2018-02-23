@@ -257,17 +257,20 @@ class TrajectoryOptimization(Dynamics):
 
                     sign_phi = np.sign(self.Phi_dot)
                     # see me notes
-                    left_mult = torques - self.wheel['radius'] * np.sign(self.Phi_dot) * bdyn.f
+                    # F = (1/r) * B^T \tau - B^T S f
+                    forces = (1/self.wheel['radius']) * bdyn.B.T.dot(torques) \
+                                - bdyn.B.T.dot(bdyn.S.dot(bdyn.f))
+                    # left_mult = torques - self.wheel['radius'] * np.sign(self.Phi_dot) * bdyn.f
 
-                    right_mult = np.zeros((4, 3))
-                    right_mult[:,-1].fill(self.l*np.sin(np.pi/4 - self.alpha))
-                    right_mult[:,:2].fill( (np.cos(theta) + np.sin(theta))/self.wheel['radius'] )
-                    right_mult[0,0] = -(np.cos(theta) - np.sin(theta))/self.wheel['radius']
-                    right_mult[1,1] = -(np.cos(theta) - np.sin(theta))/self.wheel['radius']
-                    right_mult[2,0] =  (np.cos(theta) - np.sin(theta))/self.wheel['radius']
-                    right_mult[3,1] =  (np.cos(theta) - np.sin(theta))/self.wheel['radius']
+                    # right_mult = np.zeros((4, 3))
+                    # right_mult[:,-1].fill(self.l*np.sin(np.pi/4 - self.alpha))
+                    # right_mult[:,:2].fill( (np.cos(theta) + np.sin(theta))/self.wheel['radius'] )
+                    # right_mult[0,0] = -(np.cos(theta) - np.sin(theta))/self.wheel['radius']
+                    # right_mult[1,1] = -(np.cos(theta) - np.sin(theta))/self.wheel['radius']
+                    # right_mult[2,0] =  (np.cos(theta) - np.sin(theta))/self.wheel['radius']
+                    # right_mult[3,1] =  (np.cos(theta) - np.sin(theta))/self.wheel['radius']
 
-                    forces = left_mult.dot(right_mult)
+                    # forces = left_mult.dot(right_mult)
 
                     scale_factor = 2
 
