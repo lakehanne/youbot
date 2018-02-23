@@ -28,16 +28,12 @@ class CostSum(Cost):
 
         l, lx, lu, lux, lxx,  luu = self._costs[0].eval(**kwargs)
 
-        # print('action l: ', l)
         # Compute weighted sum of each cost value and derivatives.
         weight = self._weights[0]
 
         for i in range(1, len(self._costs)):
             pl, plx, plu, plux, plxx, pluu  = self._costs[i].eval(**kwargs)
             weight = self._weights[i]
-
-            # print(self._costs[i])
-            # print('lxx: {}, plxx: {}'.format(lxx.shape, plxx.shape))
 
             l   = l + pl * weight
             lx  = lx + plx * weight

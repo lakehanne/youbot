@@ -267,22 +267,21 @@ class TrajectoryOptimization(Dynamics):
                     # F = (1/r) * B^T \tau - B^T S f
                     forces = (1/self.wheel['radius']) * bdyn.B.T.dot(torques) \
                                 - bdyn.B.T.dot(bdyn.S.dot(bdyn.f))
-                    # get laser readeings
+                    # get laser readings
                     self.pcl_rcvr.laser_listener()
                     # print('points: {}, pts len: {}'.format(self.pcl_rcvr.points, len(self.pcl_rcvr.points)))
                     #  reset points
                     self.pcl_rcvr.points = []
-                    scale_factor = 3
+                    scale_factor = 1
 
-                    wrench_base.force.x =  forces[0] * 1.5k
+                    wrench_base.force.x =  forces[0] * scale_factor
                     wrench_base.force.y =  forces[1] * scale_factor
-                    wrench_base.torque.x = forces[2] * scale_factor
+                    wrench_base.torque.y = forces[2] * scale_factor
 
-                    rospy.loginfo('\nFx: {}, Fy: {}, Fteta: {}'.format(wrench_base.force.x, 
-                            wrench_base.force.y, wrench_base.torque.x))
+                    rospy.loginfo('\nFx: {}, Fy: {}, Ftheta: {}'.format(wrench_base.force.x, 
+                            wrench_base.force.y, wrench_base.torque.y))
 
                     state_change = bdyn.q - self.goal_state
-                    # print('self.goal_state: ', self.goal_state)
                     rospy.loginfo("\nx:\t {}, \nx_bar:\t {}, \ndelx:\t {}, \nq:\t {}"
                         ", \nq*:\t {}".format(
                         new_sample_info.traj_info.state[t,:], new_sample_info.traj_info.nominal_state[t,:],

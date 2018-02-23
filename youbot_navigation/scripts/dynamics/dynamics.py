@@ -9,6 +9,7 @@ import numpy as np
 import multiprocessing
 from nav_msgs.msg import Odometry
 from collections import namedtuple
+import matplotlib.pyplot as plt
 
 from scripts.dynamics.constants import MassMaker
 from scripts.algorithm_utils import TrajectoryInfo, \
@@ -190,14 +191,13 @@ class Dynamics(MassMaker):
 
         return body_dynamics
 
-    def expand_array(self, array, dim):
+    def exp_arr(self, array, dim):
         return np.expand_dims(array, axis=dim)
 
     def get_samples(self, noisy=False):
         """
             Get N samples of states and controls from the robot
         """
-
         T   = self.T
         dU  = self.dU
         dX  = self.dX
@@ -317,19 +317,7 @@ class Dynamics(MassMaker):
             delta_x[k,:]     = x[k,:] - x_bar[k,:]
             delta_u[k,:]     = u[k,:] - u_bar[k,:]
             delta_x_star     = self.goal_state
-
-            # get neighboring state and costs 
-            l[k], lx[k], lu[k], \
-            lux[k], lxx[k],  \
-            luu[k]  = cost_sum.eval(x=delta_x[k,:], \
-                                    xstar=delta_x_star, \
-                                    u=delta_u[k,:], \
-                                    l21_const=self.l21_const, \
-                                    state_penalty=self.state_penalty, \
-                                    action_penalty=self.action_penalty)
-
-            # print('l: {} \nlx: {}, \nlu: {}, \nlux: {}, \nlxx: {}, \nluu: {}'
-            #         .format(l[k], lx[k], lu[k], lux[k], lxx[k], luu[k]))                 
+               
             # get nominal state costs 
             l_nom[k] = cost_sum.eval(x=x_bar[k,:], \
                                     xstar=delta_x_star, \
@@ -338,14 +326,27 @@ class Dynamics(MassMaker):
                                     state_penalty=self.state_penalty, \
                                     action_penalty=self.action_penalty)[0]
 
-            # get nonlinear state costs 
-            l_nlnr[k] = cost_sum.eval(x=x[k,:], \
+            # get nonlinear state cost derivatives
+            l_nlnr[k], lx[k], lu[k], \
+            lux[k], lxx[k], luu[k] = cost_sum.eval(x=x[k,:], \
                                     xstar=delta_x_star, \
                                     u=u[k,:], \
                                     l21_const=self.l21_const, \
                                     state_penalty=self.state_penalty, \
-                                    action_penalty=self.action_penalty)[0]
+                                    action_penalty=self.action_penalty)
+            
+            # form l approximation # eq 4 in iros 18 paper
+            left_mat  = np.c_[1, self.exp_arr(delta_x[k], 1).T, \
+                                self.exp_arr(delta_u[k], 1).T]               
+            inner_mat = np.r_[
+                    np.c_[l_nom[k], self.exp_arr(lx[k], 1).T, self.exp_arr(lu[k], 1).T],
+                    np.c_[self.exp_arr(lx[k], 1), lxx[k], lux[k].T],
+                    np.c_[self.exp_arr(lu[k], 1), lux[k], luu[k]]
+                    ]
+            right_mat  = left_mat.T    
 
+            l[k]   = 0.5 * left_mat.dot(inner_mat).dot(right_mat).squeeze()
+            print('l[k]: ', l[k]) 
 
             # store away stage terms
             traj_info.fx[k,:]            = fx[k,:]
