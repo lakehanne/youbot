@@ -102,7 +102,7 @@ class Dynamics(MassMaker):
         # see https://answers.ros.org/question/69754/quaternion-transformations-in-python/      
         quaternion = [self.odom.pose.pose.orientation.x, self.odom.pose.pose.orientation.y,
                         self.odom.pose.pose.orientation.z, self.odom.pose.pose.orientation.w]
-        _, theta, _  = euler_from_quaternion(quaternion, axes='sxyz')
+        _, _, theta  = euler_from_quaternion(quaternion, axes='sxyz')
         # theta is the diff in angle between Y_R and Y_I
 
         xdot = self.odom.twist.twist.linear.x
@@ -231,7 +231,7 @@ class Dynamics(MassMaker):
         # boxtacle_twist = [twist[3].linear.x, twist[3].linear.y, twist[3].linear.z,
         #                 twist[3].angular.x, twist[3].angular.y, twist[3].angular.z]                 
 
-        _, robot_angle, _ = euler_from_quaternion(self.boxtacle_pose[3:])
+        _, _, robot_angle = euler_from_quaternion(self.boxtacle_pose[3:])
         self.goal_state  = np.array(self.boxtacle_pose[:2] + [robot_angle])
         self.goal_state[0] -= 0.456 # account for box origin so robot doesn't push box when we get to final time step
 

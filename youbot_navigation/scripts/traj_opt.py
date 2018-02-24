@@ -127,21 +127,25 @@ class TrajectoryOptimization(Dynamics):
         cur.traj_info = sample['traj_info']
         cur.cost_info = sample['cost_info']
 
-        # if self.args.plot_state:
-        #     self._ax.plot(traj_info.nominal_state[t:,:], 'b', label='qpos', fontweight='bold')
-        #     # self._ax.plot(tt, nominal_state[:,1], 'g', label='qpos', fontweight='bold')
-        #     self._ax.legend(loc='best')
-        #     self._ax.set_xlabel('time (discretized)', fontweight='bold')
-        #     self._ax.set_ylabel('final q after integration', fontweight='bold')
-        #     self._ax.grid()
-        #     self._ax.gcf().set_size_inches(10,4)
-        #     self._ax.cla()
+        if self.args.plot_state:
+            plt.close('all')
+            self._ax.plot(cur.cost_info.l, label="aprrox quadratized cost")
+            # self._ax.plot(traj_info.nominal_state[t:,:], 'b', label='qpos', fontweight='bold')
+            # # self._ax.plot(tt, nominal_state[:,1], 'g', label='qpos', fontweight='bold')
+            self._ax.legend(loc='best')
+            self._ax.set_xlabel('time (discretized)', fontweight='bold')
+            self._ax.set_ylabel('cost', fontweight='bold')
+            self._ax.grid()
+            # self._ax.gcf().set_size_inches(10,4)
+            self._ax.cla()
 
-        #     if self.args.save_figs:
-        #         figs_dir = os.path.join(self.path, 'figures')
-        #         os.mkdir(figs_dir) if not os.path.exists(figs_dir) else None
-        #         self.fig.savefig(figs_dir + '/state_' + repr(t),
-        #                 bbox_inches='tight',facecolor='None')
+            plt.show()
+
+            # if self.args.save_figs:
+            #     figs_dir = os.path.join(self.path, 'figures')
+            #     os.makedirs(figs_dir) if not os.path.exists(figs_dir) else None
+            #     self.fig.savefig(figs_dir + '/cost.png',
+            #             bbox_inches='tight',facecolor='None')
 
         return cur
 
@@ -276,15 +280,15 @@ class TrajectoryOptimization(Dynamics):
 
                     wrench_base.force.x =  forces[0] * scale_factor
                     wrench_base.force.y =  forces[1] * scale_factor
-                    wrench_base.torque.y = forces[2] * scale_factor
+                    wrench_base.torque.z = forces[2] * scale_factor
 
                     rospy.loginfo('\nFx: {}, Fy: {}, Ftheta: {}'.format(wrench_base.force.x, 
                             wrench_base.force.y, wrench_base.torque.y))
 
                     state_change = bdyn.q - self.goal_state
-                    rospy.loginfo("\nx:\t {}, \nx_bar:\t {}, \ndelx:\t {}, \nq:\t {}"
+                    rospy.loginfo("\nx:\t {}, \ndelx:\t {}, \nq:\t {}"
                         ", \nq*:\t {}".format(
-                        new_sample_info.traj_info.state[t,:], new_sample_info.traj_info.nominal_state[t,:],
+                        new_sample_info.traj_info.state[t,:], 
                         new_sample_info.traj_info.delta_state[t,:], bdyn.q, 
                         self.goal_state))
                     # rospy.loginfo('\nu: {}, \nu_bar: {}, \ndelu: {}'.format(
