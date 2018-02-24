@@ -346,7 +346,6 @@ class Dynamics(MassMaker):
             right_mat  = left_mat.T    
 
             l[k]   = 0.5 * left_mat.dot(inner_mat).dot(right_mat).squeeze()
-            print('l[k]: ', l[k]) 
 
             # store away stage terms
             traj_info.fx[k,:]            = fx[k,:]

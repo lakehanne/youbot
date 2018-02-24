@@ -80,6 +80,7 @@ class TrajectoryOptimization(Dynamics):
         # config                = hyperparams.config
         self.T                = config['agent']['T']
         self.dU               = config['agent']['dU']
+        self.dV               = config['agent']['dV']
         self.dX               = config['agent']['dX']
         self.euler_step       = config['agent']['euler_step']
         self.euler_iter       = config['agent']['euler_iter']
@@ -172,7 +173,9 @@ class TrajectoryOptimization(Dynamics):
         if save:
             os.makedirs(save_dir) if not os.path.exists(save_dir) else None
             savefile = save_dir + '/trajectory.txt'
+            costfile = save_dir + '/quadratized_cost.txt'
             os.remove(savefile) if os.path.isfile(savefile) else None
+            os.remove(costfile) if os.path.isfile(costfile) else None
 
         stop_cond = self.config['trajectory']['stopping_condition']
         eta       = self.config['trajectory']['stopping_eta']
@@ -259,11 +262,11 @@ class TrajectoryOptimization(Dynamics):
                 for t in range(T):
                     # send the computed torques to ROS
                     torques = new_sample_info.traj_info.delta_action[t,:]                    
-                    # torques = new_sample_info.traj_info.nominal_action[t,:]                    
+                    # torques = new_sample_info.traj_info.action[t,:]                    
 
                     # calculate the genralized force and torques
                     bdyn = self.assemble_dynamics()
-                    theta = bdyn.q[-1] #torques[-1]  #
+                    theta = torques[-1]  #bdyn.q[-1] #
 
                     sign_phi = np.sign(self.Phi_dot)
 
@@ -283,7 +286,7 @@ class TrajectoryOptimization(Dynamics):
                     wrench_base.torque.z = forces[2] * scale_factor
 
                     rospy.loginfo('\nFx: {}, Fy: {}, Ftheta: {}'.format(wrench_base.force.x, 
-                            wrench_base.force.y, wrench_base.torque.y))
+                            wrench_base.force.y, wrench_base.torque.z))
 
                     state_change = bdyn.q - self.goal_state
                     rospy.loginfo("\nx:\t {}, \ndelx:\t {}, \nq:\t {}"
@@ -291,10 +294,6 @@ class TrajectoryOptimization(Dynamics):
                         new_sample_info.traj_info.state[t,:], 
                         new_sample_info.traj_info.delta_state[t,:], bdyn.q, 
                         self.goal_state))
-                    # rospy.loginfo('\nu: {}, \nu_bar: {}, \ndelu: {}'.format(
-                    #     new_sample_info.traj_info.action[t,:], new_sample_info.traj_info.nominal_action[t,:], 
-                    #     new_sample_info.traj_info.delta_action[t,:]))
-
                     # send the torques to the base footprint
                     send_body_wrench('base_footprint', reference_frame,
                                                     None, wrench_base, start_time,
@@ -319,6 +318,10 @@ class TrajectoryOptimization(Dynamics):
                     if save:
                         with open(savefile, 'ab') as f:
                             np.savetxt(f, np.expand_dims(bdyn.q, 0))
+
+                if save:
+                    with open(costfile, 'ab') as fc:
+                        np.savetxt(fc, new_sample_info.cost_info.l)
                 # set ubar_i = u_i, xbar_i = x_i and repeat traj_opt # step 5 DDP book
                 new_sample_info.traj_info.nominal_action = new_sample_info.traj_info.action
                 new_sample_info.traj_info.nominal_state  = new_sample_info.traj_info.state
@@ -374,10 +377,14 @@ class TrajectoryOptimization(Dynamics):
 
                 cost_info.Qx[t,:]     = cost_info.lx[t]
                 cost_info.Qu[t,:]     = cost_info.lu[t]
+                # cost_info.Qv[t,:]     = cost_info.lv[t]
                 cost_info.Qxx[t,:,:]  = cost_info.lxx[t]
                 cost_info.Qux[t,:,:]  = cost_info.lux[t]
+                # cost_info.Qvx[t,:,:]  = cost_info.lvx[t]
                 cost_info.Quu[t,:,:]  = cost_info.luu[t]
                 cost_info.Quu_tilde[t,:,:]  = cost_info.luu[t]
+                # cost_info.Qvv[t,:,:]  = cost_info.lvv[t]
+                # cost_info.Qvv_tilde[t,:,:]  = cost_info.lvv[t]
 
                 # form Q derivatives at time t first
                 if t < T-1:
