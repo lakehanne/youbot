@@ -108,14 +108,6 @@ class TrajectoryOptimization(Dynamics):
         self.linesearch_param = 1 # this is alpha in synthesis paper
         self.first_iteration = False
 
-    def get_state_rhs_eq(bdyn, x, u):
-        M, C, B, S, f = bdyn.M, bdyn.C, bdyn.B, bdyn.S, bdyn.f
-        Minv          = np.linalg.inv(M)
-        rhs  = - Minv.dot(C).dot(x) - Minv.dot(B.T).dot(S.dot(f)) \
-                         + Minv.dot(B.T).dot(u)/self.wheel['radius']
-
-        return rhs
-
     def get_traj_cost_info(self, noisy=False):
 
         T, dU, dX = self.T, self.dU, self.dX

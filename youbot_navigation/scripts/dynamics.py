@@ -196,6 +196,7 @@ class Dynamics(MassMaker):
 
         T   = self.T
         dU  = self.dU
+        dV  = self.dV
         dX  = self.dX
 
         traj_info =  TrajectoryInfo(config)
