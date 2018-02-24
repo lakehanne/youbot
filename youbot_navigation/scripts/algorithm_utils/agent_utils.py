@@ -33,6 +33,7 @@ class IterationData(BundleType):
         }
         BundleType.__init__(self, variables)
 
+
 class TrajectoryInfo(BundleType):
     """ Collection of trajectory-related variables. """
     def __init__(self, config):
@@ -46,10 +47,9 @@ class TrajectoryInfo(BundleType):
                         'fx':               np.zeros((T, dX, dX)),
                         'fu':               np.zeros((T, dX, dU)),
                         'fuu':              np.zeros((T, dU, dU)),
-                        'fux':              np.zeros((T, dU, dX)),
                         'fv':               np.zeros((T, dX, dV)),
                         'fvv':              np.zeros((T, dV, dV)),
-                        'fvx':              np.zeros((T, dV, dX)),
+                        'fux':              np.zeros((T, dU, dX)),
                         'action':           np.zeros((T, dU)),
                         'nominal_action':   np.zeros((T, dU)),
                         'delta_action':     np.zeros((T, dU)),
@@ -61,11 +61,10 @@ class TrajectoryInfo(BundleType):
                         'delta_state':      np.zeros((T, dX)),
                         'delta_state_plus': np.zeros((T, dX)),
                         'gu':               np.zeros((T, dU)),  # open loop gain
-                        'noise_covar':      np.zeros((T)),
-                        'Gu':               np.zeros((T, dU, dX)),   # closed loop gain
                         'gv':               np.zeros((T, dV)),  # open loop gain
                         'noise_covar':      np.zeros((T)),
-                        'Gv':               np.zeros((T, dV, dX))   # closed loop gain
+                        'Gu':               np.zeros((T, dU, dX)),   # closed loop gain
+                        'Gv':               np.zeros((T, dV, dX)),   # closed loop gain
                     }
         BundleType.__init__(self, variables)
 
@@ -76,6 +75,7 @@ class CostInfo(BundleType):
 
         T           = config['agent']['T']
         dU          = config['agent']['dU']
+        dV          = config['agent']['dV']
         dX          = config['agent']['dX']
 
         variables   = {
@@ -87,15 +87,24 @@ class CostInfo(BundleType):
                         'lux':              np.zeros((T, dU, dX)),
                         'lxx':              np.zeros((T, dX, dX)),
                         'luu':              np.zeros((T, dU, dU)),
+                        'lv':               np.zeros((T, dV)),
+                        'lvx':              np.zeros((T, dV, dX)),
+                        'lvv':              np.zeros((T, dV, dV)),
                         'Qx':               np.zeros((T, dX)),
                         'Qu':               np.zeros((T, dU)),
+                        'Qv':               np.zeros((T, dV)),
                         'Qxx':              np.zeros((T, dX, dX)),
                         'Qux':              np.zeros((T, dU, dX)),
+                        'Qvx':              np.zeros((T, dV, dX)),
                         'Quu':              np.zeros((T, dU, dU)),
+                        'Qvv':              np.zeros((T, dV, dV)),
                         'Qx':               np.zeros((T, dX)),
                         'Qu_tilde':         np.zeros((T, dU)),
                         'Qux_tilde':        np.zeros((T, dU, dX)),
                         'Quu_tilde':        np.zeros((T, dU, dU)),
+                        'Qv_tilde':         np.zeros((T, dV)),
+                        'Qvx_tilde':        np.zeros((T, dV, dX)),
+                        'Qvv_tilde':        np.zeros((T, dV, dV)),
                         'V':                np.zeros((T)),
                         'Vx':               np.zeros((T, dX)),
                         'Vxx':              np.zeros((T, dX, dX)),

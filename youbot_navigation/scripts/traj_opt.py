@@ -80,6 +80,7 @@ class TrajectoryOptimization(Dynamics):
         # config                = hyperparams.config
         self.T                = config['agent']['T']
         self.dU               = config['agent']['dU']
+        self.dV               = config['agent']['dV']
         self.dX               = config['agent']['dX']
         self.euler_step       = config['agent']['euler_step']
         self.euler_iter       = config['agent']['euler_iter']
@@ -259,11 +260,11 @@ class TrajectoryOptimization(Dynamics):
                 for t in range(T):
                     # send the computed torques to ROS
                     torques = new_sample_info.traj_info.delta_action[t,:]                    
-                    # torques = new_sample_info.traj_info.nominal_action[t,:]                    
+                    # torques = new_sample_info.traj_info.action[t,:]                    
 
                     # calculate the genralized force and torques
                     bdyn = self.assemble_dynamics()
-                    theta = bdyn.q[-1] #torques[-1]  #
+                    theta = torques[-1]  #bdyn.q[-1] #
 
                     sign_phi = np.sign(self.Phi_dot)
 
@@ -283,7 +284,7 @@ class TrajectoryOptimization(Dynamics):
                     wrench_base.torque.z = forces[2] * scale_factor
 
                     rospy.loginfo('\nFx: {}, Fy: {}, Ftheta: {}'.format(wrench_base.force.x, 
-                            wrench_base.force.y, wrench_base.torque.y))
+                            wrench_base.force.y, wrench_base.torque.z))
 
                     state_change = bdyn.q - self.goal_state
                     rospy.loginfo("\nx:\t {}, \ndelx:\t {}, \nq:\t {}"
@@ -374,10 +375,14 @@ class TrajectoryOptimization(Dynamics):
 
                 cost_info.Qx[t,:]     = cost_info.lx[t]
                 cost_info.Qu[t,:]     = cost_info.lu[t]
+                # cost_info.Qv[t,:]     = cost_info.lv[t]
                 cost_info.Qxx[t,:,:]  = cost_info.lxx[t]
                 cost_info.Qux[t,:,:]  = cost_info.lux[t]
+                # cost_info.Qvx[t,:,:]  = cost_info.lvx[t]
                 cost_info.Quu[t,:,:]  = cost_info.luu[t]
                 cost_info.Quu_tilde[t,:,:]  = cost_info.luu[t]
+                # cost_info.Qvv[t,:,:]  = cost_info.lvv[t]
+                # cost_info.Qvv_tilde[t,:,:]  = cost_info.lvv[t]
 
                 # form Q derivatives at time t first
                 if t < T-1:
