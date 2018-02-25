@@ -36,7 +36,5 @@ class CostAction(Cost):
         l             = 0.5 * action_penalty[0] * u_exp.T.dot(u_exp)
         lu            = action_penalty * u
         luu           = np.eye(dU)  
-        # print('luu: ', luu)      
-
 
         return l, lx, lu, lux, lxx, luu

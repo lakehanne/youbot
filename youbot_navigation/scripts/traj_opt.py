@@ -75,7 +75,6 @@ class TrajectoryOptimization(Dynamics):
         super(TrajectoryOptimization, self).__init__(Dynamics(rate))
 
         self.args            = arg
-        # self.pool_derivatives= Pool(processes=2)
 
         # config                = hyperparams.config
         self.T                = config['agent']['T']
@@ -131,8 +130,8 @@ class TrajectoryOptimization(Dynamics):
         if self.args.plot_state:
             plt.close('all')
             self._ax.plot(cur.cost_info.l, label="aprrox quadratized cost")
-            # self._ax.plot(traj_info.nominal_state[t:,:], 'b', label='qpos', fontweight='bold')
-            # # self._ax.plot(tt, nominal_state[:,1], 'g', label='qpos', fontweight='bold')
+            # self._ax.plot(traj_info.nom_state[t:,:], 'b', label='qpos', fontweight='bold')
+            # # self._ax.plot(tt, nom_state[:,1], 'g', label='qpos', fontweight='bold')
             self._ax.legend(loc='best')
             self._ax.set_xlabel('time (discretized)', fontweight='bold')
             self._ax.set_ylabel('cost', fontweight='bold')
@@ -185,7 +184,7 @@ class TrajectoryOptimization(Dynamics):
         c_zero = self.config['trajectory']['c_zero']
 
         tic    = time.time()
-        
+
         wrench_base = Wrench()
         base_angle = Twist()
 
@@ -194,7 +193,7 @@ class TrajectoryOptimization(Dynamics):
         while run:
             prev_sample_info = self.backward(sample_info, noisy)
 
-            new_sample_info  = self.forward(prev_sample_info, noisy)  
+            new_sample_info  = self.forward(prev_sample_info, noisy)
             traj_samples.append(new_sample_info)
             #################################################################
             # check if integration of state diverged from previous iteration
@@ -216,7 +215,7 @@ class TrajectoryOptimization(Dynamics):
                         - prev_traj.cost_info.l_nom[:-1], axis=0) \
                     + prev_traj.cost_info.l_nlnr[-1] \
                     - prev_traj.cost_info.l_nom[-1] # see DDP pg 113
-                
+
                 J_prev_traj = J_prev_traj.squeeze() if J_prev_traj.ndim > 1 else J_prev_traj
                 #############################################################################
                 # calculate J for estimated cost and trajectory samples
@@ -239,7 +238,7 @@ class TrajectoryOptimization(Dynamics):
                 J_curr_traj = J_curr_traj.squeeze() if J_curr_traj.ndim > 1 else J_curr_traj
                 cost_change = (J_prev_traj - J_curr_traj)/cost_change_scale
 
-                cost_change = cost_change.squeeze() + 1e-6 # to remove -0 
+                cost_change = cost_change.squeeze() + 1e-6 # to remove -0
 
                 rospy.loginfo('cost_change: {}, Jprev; {}, Jcur: {}'
                     .format(cost_change, J_prev_traj, J_curr_traj))
@@ -248,7 +247,7 @@ class TrajectoryOptimization(Dynamics):
 
             # clear buffers when list is getting too big
             traj_samples[:-2] = [] if len(traj_samples) > 10 else traj_samples
-            
+
             c = 0.5  # see DDP pg 113
             if cost_change > c and cost_change > c_zero: # accept the trajectory
 
@@ -261,8 +260,8 @@ class TrajectoryOptimization(Dynamics):
 
                 for t in range(T):
                     # send the computed torques to ROS
-                    torques = new_sample_info.traj_info.delta_action[t,:]                    
-                    # torques = new_sample_info.traj_info.action[t,:]                    
+                    torques = new_sample_info.traj_info.delta_action[t,:]
+                    # torques = new_sample_info.traj_info.action[t,:]
 
                     # calculate the genralized force and torques
                     bdyn = self.assemble_dynamics()
@@ -285,14 +284,14 @@ class TrajectoryOptimization(Dynamics):
                     wrench_base.force.y =  forces[1] * scale_factor
                     wrench_base.torque.z = forces[2] * scale_factor
 
-                    rospy.loginfo('\nFx: {}, Fy: {}, Ftheta: {}'.format(wrench_base.force.x, 
+                    rospy.loginfo('\nFx: {}, Fy: {}, Ftheta: {}'.format(wrench_base.force.x,
                             wrench_base.force.y, wrench_base.torque.z))
 
                     state_change = bdyn.q - self.goal_state
                     rospy.loginfo("\nx:\t {}, \ndelx:\t {}, \nq:\t {}"
                         ", \nq*:\t {}".format(
-                        new_sample_info.traj_info.state[t,:], 
-                        new_sample_info.traj_info.delta_state[t,:], bdyn.q, 
+                        new_sample_info.traj_info.state[t,:],
+                        new_sample_info.traj_info.delta_state[t,:], bdyn.q,
                         self.goal_state))
                     # send the torques to the base footprint
                     send_body_wrench('base_footprint', reference_frame,
@@ -323,14 +322,14 @@ class TrajectoryOptimization(Dynamics):
                     with open(costfile, 'ab') as fc:
                         np.savetxt(fc, new_sample_info.cost_info.l)
                 # set ubar_i = u_i, xbar_i = x_i and repeat traj_opt # step 5 DDP book
-                new_sample_info.traj_info.nominal_action = new_sample_info.traj_info.action
-                new_sample_info.traj_info.nominal_state  = new_sample_info.traj_info.state
+                new_sample_info.traj_info.nom_action = new_sample_info.traj_info.action
+                new_sample_info.traj_info.nom_state  = new_sample_info.traj_info.state
 
                 if not run :
                     print("Finished Traj Opt")
                     break
 
-                sample_info = new_sample_info 
+                sample_info = new_sample_info
 
             else: # repeat back+forward pass if integration diverged from prev traj by so much
                 rospy.loginfo('Repeating traj opt phase: iteration not accepted')
@@ -349,6 +348,7 @@ class TrajectoryOptimization(Dynamics):
     def backward(self, sample_info, noisy=False):
         T  = self.T
         dU = self.dU
+        dV = self.d
         dX = self.dX
 
         cost_info = sample_info.cost_info
@@ -359,32 +359,20 @@ class TrajectoryOptimization(Dynamics):
         while (non_pos_def):
 
             non_pos_def = False
-            # rospy.logdebug('Restarting back pass')
 
             for t in range (T-1, -1, -1):
-                """
-                get derivatives in a different execution thread. Following Todorov's
-                recommendation in synthesis and stabilization paper
-                """
 
-                # retrieve the erstwhile costs from future T
-                # stage_jacs = self.get_traj_cost_info(noisy=False)
-
-                # p = self.pool_derivatives.apply_async(
-                #                         self.get_traj_cost_info,
-                #                         args=(False)
-                #                         )
-
+                cost_info.Qnut[t,:]   = cost_info.l[t]
                 cost_info.Qx[t,:]     = cost_info.lx[t]
                 cost_info.Qu[t,:]     = cost_info.lu[t]
-                # cost_info.Qv[t,:]     = cost_info.lv[t]
+                cost_info.Quu[t,:,:]  = cost_info.luu[t]
                 cost_info.Qxx[t,:,:]  = cost_info.lxx[t]
                 cost_info.Qux[t,:,:]  = cost_info.lux[t]
-                # cost_info.Qvx[t,:,:]  = cost_info.lvx[t]
-                cost_info.Quu[t,:,:]  = cost_info.luu[t]
+                cost_info.Qv[t,:]     = cost_info.lv[t]
+                cost_info.Qvx[t,:,:]  = cost_info.lvx[t]
+                cost_info.Qvv[t,:,:]  = cost_info.lvv[t]
                 cost_info.Quu_tilde[t,:,:]  = cost_info.luu[t]
-                # cost_info.Qvv[t,:,:]  = cost_info.lvv[t]
-                # cost_info.Qvv_tilde[t,:,:]  = cost_info.lvv[t]
+                cost_info.Qvv_tilde[t,:,:]  = cost_info.lvv[t]
 
                 # form Q derivatives at time t first
                 if t < T-1:
@@ -392,32 +380,51 @@ class TrajectoryOptimization(Dynamics):
                     cost_info.Qx[t,:] = cost_info.lx[t] + traj_info.fx[t,:].T.dot(cost_info.Vx[t+1,:])
                     # wil be --> (4) + (4,3) x (3) ==> (4)
                     cost_info.Qu[t,:] = cost_info.lu[t] + traj_info.fu[t,:].T.dot(cost_info.Vx[t+1,:])
+                    # wil be --> (4) + (4,3) x (3) ==> (4)
+                    cost_info.Qv[t,:] = cost_info.lv[t] + traj_info.fv[t,:].T.dot(cost_info.Vx[t+1,:])
                     # wil be --> (3) + (3,3) x (3,3) x ((3,3)) ==> (3,3)
                     cost_info.Qxx[t,:,:]  = cost_info.lxx[t] + traj_info.fx[t,:].T.dot(cost_info.Vxx[t+1,:,:]).dot(traj_info.fx[t,:])
                     # wil be --> (4, 3) + (4,3) x (3,3) x ((3,3)) ==> (4,3)
                     cost_info.Qux[t,:,:]  = cost_info.lux[t] + traj_info.fu[t,:].T.dot(cost_info.Vxx[t+1,:,:]).dot(traj_info.fx[t,:])
+                    # wil be --> (4, 3) + (4,3) x (3,3) x ((3,3)) ==> (4,3)
+                    cost_info.Qvx[t,:,:]  = cost_info.lvx[t] + traj_info.fv[t,:].T.dot(cost_info.Vxx[t+1,:,:]).dot(traj_info.fx[t,:])
                     # wil be --> (4, 4) + (4,3) x (3,3) x ((3,4)) ==> (4,4)
                     cost_info.Quu[t,:,:]  = cost_info.luu[t] + traj_info.fu[t,:].T.dot(cost_info.Vxx[t+1,:,:]).dot(traj_info.fu[t,:])
+                    # wil be --> (4, 4) + (4,3) x (3,3) x ((3,4)) ==> (4,4)
+                    cost_info.Qvv[t,:,:]  = cost_info.lvv[t] + traj_info.fv[t,:].T.dot(cost_info.Vxx[t+1,:,:]).dot(traj_info.fv[t,:])
 
                     # calculate the Qvals that penalize devs from the states
                     cost_info.Qu_tilde[t,:] = cost_info.Qu[t,:] + self.mu * np.ones(dU)
+                    cost_info.Qv_tilde[t,:] = cost_info.Qv[t,:] + self.mu * np.ones(dV)
                     cost_info.Quu_tilde[t,:,:] = cost_info.luu[t] + traj_info.fu[t,:].T.dot(\
                                     cost_info.Vxx[t+1,:,:] + self.mu * np.eye(dX)).dot(traj_info.fu[t,:])
+                    cost_info.Qvv_tilde[t,:,:] = cost_info.lvv[t] + traj_info.fv[t,:].T.dot(\
+                                    cost_info.Vxx[t+1,:,:] + self.mu * np.eye(dX)).dot(traj_info.fv[t,:])
                     cost_info.Qux_tilde[t,:,:] = cost_info.lux[t] + traj_info.fu[t,:].T.dot(\
+                                    cost_info.Vxx[t+1,:,:] + self.mu * np.eye(dX)).dot(traj_info.fx[t,:]) #+ \
+                                    #traj_info.fux[t,:,:].dot(cost_info.Vx[t+1,:])
+                    cost_info.Qvx_tilde[t,:,:] = cost_info.lvx[t] + traj_info.fv[t,:].T.dot(\
                                     cost_info.Vxx[t+1,:,:] + self.mu * np.eye(dX)).dot(traj_info.fx[t,:]) #+ \
                                     #traj_info.fux[t,:,:].dot(cost_info.Vx[t+1,:])
 
                 # symmetrize the second order moments of Q
                 cost_info.Quu[t,:,:] = 0.5 * (cost_info.Quu[t].T + cost_info.Quu[t])
+                cost_info.Qvv[t,:,:] = 0.5 * (cost_info.Qvv[t].T + cost_info.Qvv[t])
                 cost_info.Qxx[t,:,:] = 0.5 * (cost_info.Qxx[t].T + cost_info.Qxx[t])
 
                 # symmetrize for improved Q state improvement values too
                 cost_info.Quu_tilde[t,:,:] = 0.5 * (cost_info.Quu_tilde[t].T + \
                             cost_info.Quu_tilde[t])
+                cost_info.Qvv_tilde[t,:,:] = 0.5 * (cost_info.Qvv_tilde[t].T + \
+                            cost_info.Qvv_tilde[t])
                 # Compute Cholesky decomposition of Q function action component.
                 try:
-                    U_tilde = sp.linalg.cholesky(cost_info.Quu_tilde[t,:,:])
-                    L_tilde = U_tilde.T
+                    U = sp.linalg.cholesky(cost_info.Quu[t,:,:])
+                    L = U.T
+                    V = sp.linalg.cholesky(cost_info.Qvv[t,:,:])
+                    Lv = V.T
+                    # U_tilde = sp.linalg.cholesky(cost_info.Quu_tilde[t,:,:])
+                    # L_tilde = U_tilde.T
                 except LinAlgError as e:
                     # Error thrown when Qtt[idx_u, idx_u]  or Q_tilde[u, u] is not spd
                     rospy.loginfo('LinAlgError: %s', e)
@@ -426,44 +433,63 @@ class TrajectoryOptimization(Dynamics):
                     break
 
                 # compute open and closed loop gains.
-                small_k   = -sp.linalg.solve_triangular(
-                                U_tilde, sp.linalg.solve_triangular(L_tilde,
-                                cost_info.Qu_tilde[t, :], lower=True)
+                invQuu = sp.linalg.solve_triangular(
+                            U, sp.linalg.solve_triangular(L, np.eye(dU), lower=True) )
+                invQvv = sp.linalg.solve_triangular(
+                            V, sp.linalg.solve_triangular(Lv, np.eye(dV), lower=True) )
+                Ku     = np.linalg.pinv(cost_info.Quu[t] 
+                            - cost_info.Quu[t].dot(invQuu.dot(cost_info.Quv[t].dot(\
+                                invQvv[t]).dot(cost_info.Quv[t].T)))
                             )
-                big_K = -sp.linalg.solve_triangular(
-                                U_tilde, sp.linalg.solve_triangular(L_tilde,
-                                cost_info.Qux_tilde[t, :, :], lower=True)
-                            )
+                Kv     = np.linalg.pinv(cost_info.Qvv[t] 
+                            - cost_info.Qvv[t].dot(invQvv.dot(cost_info.Quv[t].T.dot(\
+                                invQuu[t]).dot(cost_info.Quv[t])))
+                            )                
+                gu   = Ku.dot(cost_info.Quv[t].dot(invQvv).dot(cost_info.Qv[t]) \
+                                 - cost_info.Qu[t]
+                                 )
+                gv   = Kv.dot(cost_info.Quv[t].T.dot(invQuu).dot(cost_info.Qu[t]) \
+                                 - cost_info.Qv[t]
+                                 )   
+                Gu   = Ku.dot(cost_info.Quv[t].dot(invQvv).dot(cost_info.Qvx[t]) \
+                                 - cost_info.Qux[t]
+                                 )
+                Gv   = Kv.dot(cost_info.Quv[t].T.dot(invQuu).dot(cost_info.Qux[t]) \
+                                 - cost_info.Qvx[t]
+                                 )                 
+
                 # store away the gains
-                traj_info.gu[t, :] = small_k
-                traj_info.Gu[t, :, :] = big_K
+                traj_info.gu[t, :] = gu
+                traj_info.gv[t, :] = gv
+                traj_info.Gu[t, :, :] = Gu
+                traj_info.Gv[t, :, :] = Gv
 
                 # calculate improved value functions
-                cost_info.Vxx[t,:,:] = cost_info.Qxx[t, :,:] \
-                                        + big_K.T.dot(cost_info.Quu[t,:,:]).dot(big_K) \
-                                        + big_K.T.dot(cost_info.Qux[t,:,:] \
-                                        ) + cost_info.Qux[t,:,:].T.dot(traj_info.Gu[t,:,:])
+                cost_info.V[t] = 0.5 *(gu.dot(cost_info.Quu[t]).dot(gu)  \
+                                    +  gv.dot(cost_info.Qvv[t]).dot(gv)) \
+                                    +  gu.dot(cost_info.Qu[t]) \
+                                    +  gv.dot(cost_info.Qv[t]) \
+                                    +  gu.dot(cost_info.Quv[t]).dot(gv) 
 
                 cost_info.Vx[t,:] = cost_info.Qx[t,:] \
-                                    + big_K.T.dot(cost_info.Quu[t,:,:]).dot(small_k) \
-                                    + big_K.T.dot(cost_info.Qu[t,:]) \
-                                    + traj_info.gu[t,:].T.dot(cost_info.Qux[t,:,:])
+                                    + cost_info.Qu[t].dot(Gu)\
+                                    + cost_info.Qv[t].dot(Gv)\
+                                    + gu.dot(cost_info.Quu[t]).dot(Gu) \
+                                    + gv.dot(cost_info.Qvv[t]).dot(Gv) \
+                                    + gu.dot(cost_info.Qux[t]) \
+                                    + gv.dot(cost_info.Qvx[t]) \
+                                    + gu.dot(cost_info.Quv[t]).dot(Gv[t]) \
+                                    + gv.dot(cost_info.Quv[t].T).dot(Gu[t])
 
-                cost_info.V[t] = 0.5 * np.expand_dims(small_k, 1).T.dot(\
-                                    cost_info.Quu[t,:,:]).dot(np.expand_dims(small_k, 1))  \
-                                    +  np.expand_dims(small_k, 1).T.dot(cost_info.Qu[t,:])
+                cost_info.Vxx[t,:,:] = cost_info.Qxx[t] \
+                                    + Gu.T.dot(cost_info.Quu[t,:,:]).dot(Gu) \
+                                    + Gv.T.dot(cost_info.Qvv[t,:,:]).dot(Gv) \
+                                    + 2*Gu.T.dot(cost_info.Qux[t,:,:]) \
+                                    + 2*Gv.T.dot(cost_info.Qvx[t,:,:]) \
+                                    + 2*Gu.T.dot(cost_info.Quv[t,:,:]).dot(Gv) 
 
                 # symmetrize quadratic Value hessian
                 cost_info.Vxx[t,:,:] = 0.5 * (cost_info.Vxx[t,:,:] + cost_info.Vxx[t,:,:].T)
-
-                # print('Qu_tilde: \n', cost_info.Qu_tilde[t])
-                # print('Quu_tilde: \n', cost_info.Quu_tilde[t,:])
-                # print('Qux_tilde: \n', cost_info.Qux_tilde[t,:])
-                # print('V: ', cost_info.V[t])
-                # print('Vx: \n', cost_info.Vx[t])
-                # print('Vxx: \n', cost_info.Vxx[t])
-                # print('Vxx: \n', cost_info.l[t])
-                # time.sleep(2)
 
             if non_pos_def: # restart the back-pass process
                 old_mu = self.mu
@@ -486,6 +512,7 @@ class TrajectoryOptimization(Dynamics):
     def forward(self, prev_sample_info, noisy):
         T  = self.T
         dU = self.dU
+        dV = self.dV
         dX = self.dX
 
         # forward pass params
@@ -496,17 +523,33 @@ class TrajectoryOptimization(Dynamics):
         traj_info = prev_sample_info.traj_info
         cost_info = prev_sample_info.cost_info
 
+        bdyn = self.assemble_dynamics()
         # start fwd pass
+        traj_info.state[0] = traj_info.nom_state[0]
+
         for t in range(1, T-1):
             # update the nominal action that was assumed
-            traj_info.nominal_action[t,:] = traj_info.nominal_action[t,:] \
-                                                + alpha * traj_info.gu[t, :] \
-                                                + traj_info.Gu[t, :].dot(traj_info.nominal_state[t,:])
+            # traj_info.nom_action[t,:] = traj_info.nom_action[t,:] \
+            #                                     + alpha * traj_info.gu[t, :] \
+            #                                     + traj_info.Gu[t, :].dot(traj_info.nom_state[t,:])
 
-            traj_info.delta_action[t,:] = traj_info.delta_action[t,:] \
+            # traj_info.delta_action[t,:] = traj_info.delta_action[t,:] \
+            #                                     + alpha * traj_info.gu[t, :] \
+            #                                     + traj_info.Gu[t, :].dot(traj_info.delta_state[t,:])
+            
+            traj_info.action[t,:]       = traj_info.action[t,:] \
                                                 + alpha * traj_info.gu[t, :] \
-                                                + traj_info.Gu[t, :].dot(traj_info.delta_state[t,:])
-           
+                                                + traj_info.Gu[t, :].dot(traj_info.state[t,:])
+
+            # update state x(t+1) = f(x(t), u(t))
+            traj_info.state[t+1,:]      = traj_info.state[t] \
+                                            + delta_t * self.get_state_rhs_eq(bdyn, traj_info.state[t], traj_info.action[t])
+
+            # set ubar_i = u_i, x_bar_i = x_i
+            traj_info.nom_action[t]   = traj_info.action[t]
+            traj_info.nom_state[t]    = traj_info.state[t]
+
+
         prev_sample_info.traj_info = traj_info
         # prev_sample_info.cost_info = cost_info
 

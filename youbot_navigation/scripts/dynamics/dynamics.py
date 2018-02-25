@@ -46,6 +46,7 @@ class Dynamics(MassMaker):
         self.agent            = config['agent']
         self.T                = config['agent']['T']
         self.dU               = config['agent']['dU']
+        self.dV               = config['agent']['dV']
         self.dX               = config['agent']['dX']
         self.goal_state       = None #config['agent']['goal_state']
 
@@ -200,6 +201,7 @@ class Dynamics(MassMaker):
         """
         T   = self.T
         dU  = self.dU
+        dV  = self.dV
         dX  = self.dX
 
         traj_info =  TrajectoryInfo(config)
@@ -243,18 +245,22 @@ class Dynamics(MassMaker):
 
         # allocate space for local controls
         u       = np.zeros((T, dU))
+        v       = np.zeros((T, dV))
         x       = np.zeros((T, dX))
 
         delta_u = np.zeros_like(u)
+        delta_v = np.zeros_like(v)
         delta_x = np.zeros_like(x)
 
         u_bar   = np.zeros_like(u) #np.random.randint(low=1, high=10, size=(T, dU))  #
+        v_bar   = generate_noise(T, dV, self.agent)
         # initialize u_bar
         u_bar[:,] = config['trajectory']['init_action']
         x_bar   = np.zeros_like(x)
 
         fx      = np.zeros((T, dX, dX))
         fu      = np.zeros((T, dX, dU))
+        fv      = np.zeros((T, dX, dV))
 
         x_noise = generate_noise(T, dX, self.agent)
 
@@ -263,9 +269,13 @@ class Dynamics(MassMaker):
         l_nom    = np.zeros((T))
         l_nlnr   = np.zeros((T))
         lu       = np.zeros((T, dU))
+        lv       = np.zeros((T, dV))
         lx       = np.zeros((T, dX))
         lxx      = np.zeros((T, dX, dX))
         luu      = np.zeros((T, dU, dU))
+        luv      = np.zeros((T, dU, dV))
+        lvv      = np.zeros((T, dV, dV))
+        lvx      = np.zeros((T, dV, dX))
         lux      = np.zeros((T, dU, dX))
 
        # apply u_bar to deterministic system
@@ -287,6 +297,9 @@ class Dynamics(MassMaker):
             Minv            = np.linalg.inv(M)
             rhs             = - Minv.dot(C).dot(x_bar[k,:]) - Minv.dot(B.T).dot(S.dot(f)) \
                               + Minv.dot(B.T).dot(u_bar[k, :])/self.wheel['radius']
+
+            rhsv            = - Minv.dot(C).dot(x_bar[k,:]) - Minv.dot(B.T).dot(S.dot(f)) \
+                            + Minv.dot(B.T).dot(v_bar[k, :])/self.wheel['radius']                              
             # print('rhs: ', rhs, 'xbar: ')
             if k == 0:
                 x_bar[k]    = delta_t * rhs
@@ -350,18 +363,23 @@ class Dynamics(MassMaker):
             # store away stage terms
             traj_info.fx[k,:]            = fx[k,:]
             traj_info.fu[k,:]            = fu[k,:]
+            traj_info.fv[k,:]            = fv[k,:]
             traj_info.action[k,:]        = u[k,:]
             traj_info.state[k,:]         = x[k,:]
-            traj_info.delta_state[k,:]   = delta_x[k,:]
+            traj_info.nom_action[k,:]    = u_bar[k,:]
+            traj_info.nom_state[k,:]     = x_bar[k,:]
             traj_info.delta_action[k,:]  = delta_u[k,:]
-            traj_info.nominal_state[k,:] = x_bar[k,:]
-            traj_info.nominal_action[k,:]= u_bar[k,:]
+            traj_info.delta_state[k,:]   = delta_x[k,:]
 
             cost_info.l[k]   = l[k]
             cost_info.lu[k]  = lu[k]
+            cost_info.lv[k]  = lv[k]
             cost_info.lx[k]  = lx[k]
             cost_info.lux[k] = lux[k]
+            cost_info.lvx[k] = lvx[k]
             cost_info.luu[k] = luu[k]
+            cost_info.luv[k] = luv[k]
+            cost_info.lvv[k] = lvv[k]
             cost_info.lxx[k] = lxx[k]
             cost_info.l_nom[k]   = l_nom[k]
             cost_info.l_nlnr[k]  = l_nlnr[k]
