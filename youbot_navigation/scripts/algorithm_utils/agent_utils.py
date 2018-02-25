@@ -48,20 +48,20 @@ class TrajectoryInfo(BundleType):
                         'fu':               np.zeros((T, dX, dU)),
                         'fuu':              np.zeros((T, dU, dU)),
                         'fux':              np.zeros((T, dU, dX)),
-                        'fv':               np.zeros((T, dX, dV)),
-                        'fvv':              np.zeros((T, dV, dV)),
                         'action':           np.zeros((T, dU)),
                         'nom_action':       np.zeros((T, dU)),
                         'delta_action':     np.zeros((T, dU)),
-                        'act_adv':          np.zeros((T, dV)),
-                        'nom_act_adv':      np.zeros((T, dV)),
-                        'delta_act_adv':    np.zeros((T, dV)),
                         'state':            np.zeros((T, dX)),
                         'nom_state':        np.zeros((T, dX)),
                         'delta_state':      np.zeros((T, dX)),
                         'Gu':               np.zeros((T, dU, dX)),   # closed loop gain
                         'gu':               np.zeros((T, dU)),  # open loop gain
                         'noise_covar':      np.zeros((T)),
+                        'act_adv':          np.zeros((T, dV)),
+                        'nom_act_adv':      np.zeros((T, dV)),
+                        'delta_act_adv':    np.zeros((T, dV)),
+                        'fv':               np.zeros((T, dX, dV)),
+                        'fvv':              np.zeros((T, dV, dV)),
                         'gv':               np.zeros((T, dV)),  # open loop gain
                         'Gv':               np.zeros((T, dV, dX)),   # closed loop gain
                     }

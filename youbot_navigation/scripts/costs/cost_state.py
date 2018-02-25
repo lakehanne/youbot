@@ -22,8 +22,8 @@ class CostState(Cost):
 
         x             = kwargs['x'] 
         xstar         = kwargs['xstar'] 
-        alpha         = kwargs['alpha']
-        wx            = kwargs['wx']
+        wx            = self.config['all_costs']['wx']
+        alpha         = self.config['all_costs']['alpha'] 
 
         # expand the state        
         state_diff    = x - xstar # this is correct. see matlab code

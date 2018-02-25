@@ -16,10 +16,11 @@ class CostAction(Cost):
 
         u             = kwargs['u'] 
         v             = kwargs['v'] 
-        wu            = kwargs['wu']
-        wv            = kwargs['wv']
-        alpha         = kwargs['alpha']
-        gamma         = kwargs['gamma']
+
+        wu            = self.config['all_costs']['wu']
+        wv            = self.config['all_costs']['wv']
+        alpha         = self.config['all_costs']['alpha']
+        gamma         = self.config['all_costs']['gamma']
 
         u_exp         = np.expand_dims(u, axis=1)
         v_exp         = np.expand_dims(v, axis=1)

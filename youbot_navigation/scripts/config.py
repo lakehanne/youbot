@@ -15,9 +15,6 @@ config = {
     'num_samples':	5,
 	'conditions':	4,
 	'cost_params':	{
-		'wu': np.array([0.0001, 0.0001, 0.0001, 0.0001]),
-		'wv': np.array([1, 1, 1, 1]),
-		'wx': np.array([1, 1, 1]),
 		'final_cost_weight': 1e-2,
 		'stage_cost_weight': 1e-2,
 	},
@@ -63,8 +60,12 @@ config = {
 	    'type': CostSum,
 	    'costs': [{'type': CostAction, 'wu': np.array([1, 1])}, {'type': CostState}],
 	    'weights': [1.0, 1.0],
-	    'mode': 'antagonist',
-	    'gamma': 1e0,
+	    'mode': 'robust',
+	    'gamma': 1.0,
+	    'alpha': 0.0001,
+		'wu': np.array([0.0001, 0.0001, 0.0001, 0.0001]),
+		'wv': np.array([1, 1, 1, 1]),
+		'wx': np.array([1, 1, 1]),
 	},
 
 	'linearized_params': {

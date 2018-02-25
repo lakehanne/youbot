@@ -210,14 +210,14 @@ class Dynamics(MassMaker):
         wv       = config['agent']['wv']
         wx       = config['agent']['wx']
 
-        model_states = self.model_rcvr.model_states
-        pose = model_states.pose
+        ms       = self.model_rcvr.model_states
+        pose     = ms.pose
 
-        self.boxtacle_pose  = [pose[-1].position.x, pose[-1].position.y, pose[-1].position.z,
+        boxtacle_pose  = [pose[-1].position.x, pose[-1].position.y, pose[-1].position.z,
                          pose[-1].orientation.x, pose[-1].orientation.y, pose[-1].orientation.z,
                          pose[-1].orientation.w]
-        _, _, robot_angle = euler_from_quaternion(self.boxtacle_pose[3:])
-        self.goal_state  = np.array(self.boxtacle_pose[:2] + [robot_angle])
+        _, _, robot_angle = euler_from_quaternion(boxtacle_pose[3:])
+        self.goal_state  = np.array(boxtacle_pose[:2] + [robot_angle])
         self.goal_state[0] -= 0.456 # account for box origin so robot doesn't push box when we get to final time step
 
         # see generalized ILQG Summary page
@@ -236,9 +236,9 @@ class Dynamics(MassMaker):
         del_x   = np.zeros_like(x)
 
         u_bar   = np.zeros_like(u) #np.random.randint(low=1, high=10, size=(T, dU))  #
+        u_bar[:,] = config['trajectory']['init_action']
         v_bar   = generate_noise(T, dV, self.agent)
         # initialize u_bar
-        u_bar[:,] = config['trajectory']['init_action']
         x_bar   = np.zeros_like(x)
 
         fx      = np.zeros((T, dX, dX))
@@ -255,11 +255,11 @@ class Dynamics(MassMaker):
         lv       = np.zeros((T, dV))
         lx       = np.zeros((T, dX))
         lxx      = np.zeros((T, dX, dX))
-        luu      = np.zeros((T, dU, dU))
-        luv      = np.zeros((T, dU, dV))
         lvv      = np.zeros((T, dV, dV))
         lvx      = np.zeros((T, dV, dX))
         lux      = np.zeros((T, dU, dX))
+        luu      = np.zeros((T, dU, dU))
+        luv      = np.zeros((T, dU, dV))
 
         for k in range(K):
             # get body dynamics. Note that some of these are time varying parameters
@@ -294,7 +294,7 @@ class Dynamics(MassMaker):
             # step 2.2: set up nonlinear dynamics at k
             u[k,:]      = lhs.dot(M.dot(qaccel) + C.dot(qvel) + \
                                     B.T.dot(S).dot(f)).squeeze()
-            v[k,:]      = generate_noise(1, dV, self.agent)
+            v[k,:]      = u[k,:] + generate_noise(1, dV, self.agent)
 
             # inject noise to the states
             x[k,:]      = q + x_noise[k, :] if noisy else q
@@ -307,7 +307,9 @@ class Dynamics(MassMaker):
 
             # calculate the jacobians
             fx[k,:,:]   = np.eye(self.dX) - delta_t * Minv.dot(C)
-            fu[k,:,:]   = -(delta_t * self.wheel['radius']) * Minv.dot(B.T)
+            fu[k,:,:]   = (delta_t * self.wheel['radius']) * Minv.dot(B.T)
+            fv[k,:,:]   = -(delta_t * gamma * self.wheel['radius']) \
+                             * Minv.dot(B.T)
 
             #step 2.3 set up state-action deviations
             del_x[k,:]     = x[k,:] - x_bar[k,:]
@@ -316,43 +318,41 @@ class Dynamics(MassMaker):
             del_x_star     = self.goal_state
                
             # get nominal state costs 
-            l_nom[k] = cost_sum.eval(x=x_bar[k,:], \
-                                    xstar=del_x_star, \
-                                    u=u_bar[k,:], \
-                                    l21_const=self.l21_const, \
-                                    state_penalty=self.state_penalty, \
-                                    wu=wu)[0]
+            l_nom[k] = cost_sum.eval(x=x_bar[k,:], xstar=del_x_star, \
+                                     u=u_bar[k,:], v=v_bar[k,:])[0]
 
             # get nonlinear state cost derivatives
-            l_nlnr[k], lx[k], lu[k], \
-            lux[k], lxx[k], luu[k] = cost_sum.eval(x=x[k,:], \
-                                    xstar=del_x_star, \
-                                    u=u[k,:], \
-                                    l21_const=self.l21_const, \
-                                    state_penalty=self.state_penalty, \
-                                    wu=wu)
+            l_nlnr[k], lx[k], lu[k], lv[k], lux[k], lvx[k], lxx[k] \
+            luu[k], luv[k], lvv[k] = cost_sum.eval(x=x[k,:], xstar=del_x_star, \
+                                                 u=u_bar[k,:], v=v_bar[k,:])
             
             # form l approximation # eq 4 in iros 18 paper
             left_mat  = np.c_[1, self.exp_arr(del_x[k], 1).T, \
-                                self.exp_arr(del_u[k], 1).T]               
+                                self.exp_arr(del_u[k], 1).T, self.exp_arr(del_v[k], 1).T]               
             inner_mat = np.r_[
-                    np.c_[l_nom[k], self.exp_arr(lx[k], 1).T, self.exp_arr(lu[k], 1).T],
-                    np.c_[self.exp_arr(lx[k], 1), lxx[k], lux[k].T],
-                    np.c_[self.exp_arr(lu[k], 1), lux[k], luu[k]]
-                    ]
+                            np.c_[l_nom[k], self.exp_arr(lx[k], 1).T, self.exp_arr(lu[k], 1).T, self.exp_arr(lv[k], 1).T],
+                            np.c_[self.exp_arr(lx[k], 1), lxx[k], lux[k].T, lvx[k].T],
+                            np.c_[self.exp_arr(lu[k], 1), lux[k], luu[k],   luv[k]],
+                            np.c_[self.exp_arr(lv[k], 1), lvx[k], luv[k].T, lvv[k]]
+                        ]
             right_mat  = left_mat.T    
 
             l[k]   = 0.5 * left_mat.dot(inner_mat).dot(right_mat).squeeze()
+
+            print('l: ', l[k])
 
             # store away stage terms
             traj_info.fx[k,:]            = fx[k,:]
             traj_info.fu[k,:]            = fu[k,:]
             traj_info.fv[k,:]            = fv[k,:]
             traj_info.action[k,:]        = u[k,:]
+            traj_info.act_adv[k,:]       = v[k,:]
             traj_info.state[k,:]         = x[k,:]
-            traj_info.nom_action[k,:]    = u_bar[k,:]
             traj_info.nom_state[k,:]     = x_bar[k,:]
+            traj_info.nom_action[k,:]    = u_bar[k,:]
+            traj_info.nom_act_adv[k,:]   = v_bar[k,:]
             traj_info.delta_action[k,:]  = del_u[k,:]
+            traj_info.delta_act_adv[k,:] = del_v[k,:]
             traj_info.delta_state[k,:]   = del_x[k,:]
 
             cost_info.l[k]   = l[k]
