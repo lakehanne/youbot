@@ -206,9 +206,10 @@ class Dynamics(MassMaker):
 
         cost_sum = CostSum(config)  
 
-        wu       = config['agent']['wu']
-        wv       = config['agent']['wv']
-        wx       = config['agent']['wx']
+        wu       = config['all_costs']['wu']
+        wv       = config['all_costs']['wv']
+        wx       = config['all_costs']['wx']
+        gamma       = config['all_costs']['gamma']
 
         ms       = self.model_rcvr.model_states
         pose     = ms.pose
@@ -322,7 +323,7 @@ class Dynamics(MassMaker):
                                      u=u_bar[k,:], v=v_bar[k,:])[0]
 
             # get nonlinear state cost derivatives
-            l_nlnr[k], lx[k], lu[k], lv[k], lux[k], lvx[k], lxx[k] \
+            l_nlnr[k], lx[k], lu[k], lv[k], lux[k], lvx[k], lxx[k], \
             luu[k], luv[k], lvv[k] = cost_sum.eval(x=x[k,:], xstar=del_x_star, \
                                                  u=u_bar[k,:], v=v_bar[k,:])
             
@@ -337,9 +338,9 @@ class Dynamics(MassMaker):
                         ]
             right_mat  = left_mat.T    
 
-            l[k]   = 0.5 * left_mat.dot(inner_mat).dot(right_mat).squeeze()
+            l[k]   = 0.5 * left_mat.dot(inner_mat).dot(right_mat)#.squeeze()
 
-            print('l: ', l[k])
+            print('ldyn: ', l[k])
 
             # store away stage terms
             traj_info.fx[k,:]            = fx[k,:]

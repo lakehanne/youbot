@@ -40,10 +40,12 @@ class CostState(Cost):
         stage_term    = xs_exp.T.dot(np.diag(wx)).dot(xs_exp)
 
         l             = np.sqrt(alpha + stage_term)
+        l             = l.squeeze() if l.ndim > 1 else None
+        
         lx            = (wx * state_diff) / l
         lxx           = (alpha * wx) / (l ** 3)
         lxx           = np.diag(lxx)
 
-        print('l: {}, \nlx: {}, \nlxx: {}'.format(l, lx, lxx))
+        # print('l: {}, \nlx: {}, \nlxx: {}'.format(l, lx, lxx))
 
         return l, lx, lu, lv, lux, lvx, lxx, luu, luv, lvv

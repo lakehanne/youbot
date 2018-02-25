@@ -33,7 +33,7 @@ class CostSum(Cost):
         weight = self._weights[0]
 
         for i in range(1, len(self._costs)):
-            l, lx, lu, lv, lux, lvx, lxx, luu, luv, lvv \
+            pl, plx, plu, plv, plux, plvx, plxx, pluu, pluv, plvv \
                  = self._costs[i].eval(**kwargs)
             weight = self._weights[i]
 

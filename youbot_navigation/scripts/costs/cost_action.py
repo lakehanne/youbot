@@ -40,13 +40,15 @@ class CostAction(Cost):
 
         l             = (alpha**2) * (np.cosh(wu_exp.T.dot(u_exp)) \
                         - gamma*np.cosh(wv_exp.T.dot(v_exp)))
+        l             = l.squeeze() if l.ndim > 1 else None
+        
         lu            = (alpha**2) * wu * np.sinh(wu*u)
-        lv            = -gamm*(alpha**2) * wv * np.sinh(wv*v)
+        lv            = -gamma*(alpha**2) * wv * np.sinh(wv*v)
         luu           = np.diag((alpha**2) * (wu**2) * np.cosh(wu*u))
         lvv           = np.diag(-(alpha**2) * gamma * (wv**2) * np.cosh(wv*v))
 
 
-        print('l: {}, \nlu: {}, \nluu: {}'.format(l, lu, luu)) 
-        print('lv: {}, \nlvv: {}, \nluv: {}'.format(lv, lvv, luv)) 
+        # print('l: {}, \nlu: {}, \nluu: {}'.format(l, lu, luu)) 
+        # print('lv: {}, \nlvv: {}, \nluv: {}'.format(lv, lvv, luv)) 
 
         return l, lx, lu, lv, lux, lvx, lxx, luu, luv, lvv

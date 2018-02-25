@@ -84,9 +84,6 @@ class TrajectoryOptimization(Dynamics):
         self.euler_step       = config['agent']['euler_step']
         self.euler_iter       = config['agent']['euler_iter']
         self.goal_state       = config['agent']['goal_state']
-        self.l21_const        = config['agent']['alpha']
-        self.action_penalty   = config['cost_params']['action_penalty']
-        self.state_penalty    = config['cost_params']['state_penalty']
         self.TOL              = config['agent']['TOL']
 
         # backpass regularizers
