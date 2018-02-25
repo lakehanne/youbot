@@ -14,27 +14,38 @@ class CostAction(Cost):
 
     def eval(self, **kwargs):
 
+        u             = kwargs['u'] 
+        v             = kwargs['v'] 
+        wu            = kwargs['wu']
+        wv            = kwargs['wv']
+        alpha         = kwargs['alpha']
+        gamma         = kwargs['gamma']
+
+        u_exp         = np.expand_dims(u, axis=1)
+        v_exp         = np.expand_dims(v, axis=1)
+        wu_exp        = np.expand_dims(wu, axis=1)
+        wv_exp        = np.expand_dims(wv, axis=1)
+
         T             = self.config['agent']['T']
         dU            = self.config['agent']['dU']
         dV            = self.config['agent']['dV']
         dX            = self.config['agent']['dX']
 
-        u             = kwargs['u'] 
-        l21_const     = kwargs['l21_const']
-        action_penalty= kwargs['action_penalty']
-
-        u_exp = np.expand_dims(u, axis=1)
-
         lx            = np.zeros((dX))
         lux           = np.zeros((dU, dX))
+        luv           = np.zeros((dU, dV))
+        lvx           = np.zeros((dV, dX))
         lxx           = np.zeros((dX, dX))
 
-        # l             = LA.norm(action_penalty * l21_const **2 * np.cosh( (u/l21_const) - 1))
-        # lu            = action_penalty * l21_const* np.sinh(u/l21_const)
-        # luu           = np.diag(np.cosh(u/l21_const))
+        l             = (alpha**2) * (np.cosh(wu_exp.T.dot(u_exp)) \
+                        - gamma*np.cosh(wv_exp.T.dot(v_exp)))
+        lu            = (alpha**2) * wu * np.sinh(wu*u)
+        lv            = -gamm*(alpha**2) * wv * np.sinh(wv*v)
+        luu           = np.diag((alpha**2) * (wu**2) * np.cosh(wu*u))
+        lvv           = np.diag(-(alpha**2) * gamma * (wv**2) * np.cosh(wv*v))
 
-        l             = 0.5 * action_penalty[0] * u_exp.T.dot(u_exp)
-        lu            = action_penalty * u
-        luu           = np.eye(dU)  
 
-        return l, lx, lu, lux, lxx, luu
+        print('l: {}, \nlu: {}, \nluu: {}'.format(l, lu, luu)) 
+        print('lv: {}, \nlvv: {}, \nluv: {}'.format(lv, lvv, luv)) 
+
+        return l, lx, lu, lv, lux, lvx, lxx, luu, luv, lvv

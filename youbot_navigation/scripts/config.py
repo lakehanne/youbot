@@ -15,8 +15,9 @@ config = {
     'num_samples':	5,
 	'conditions':	4,
 	'cost_params':	{
-		'action_penalty': np.array([0.0001, 0.0001, 0.0001, 0.0001]),
-		'state_penalty': np.array([1, 1, 1]),
+		'wu': np.array([0.0001, 0.0001, 0.0001, 0.0001]),
+		'wv': np.array([1, 1, 1, 1]),
+		'wx': np.array([1, 1, 1]),
 		'final_cost_weight': 1e-2,
 		'stage_cost_weight': 1e-2,
 	},

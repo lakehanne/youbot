@@ -22,40 +22,28 @@ class CostState(Cost):
 
         x             = kwargs['x'] 
         xstar         = kwargs['xstar'] 
-        l21_const     = kwargs['l21_const']
-        state_penalty = kwargs['state_penalty']
+        alpha         = kwargs['alpha']
+        wx            = kwargs['wx']
 
         # expand the state        
-        state_diff    = x - xstar
-        x_exp         = np.expand_dims(x, axis=1)  # this is correct. see matlab code
+        state_diff    = x - xstar # this is correct. see matlab code
         xs_exp        = np.expand_dims(x-xstar, axis=1) 
 
         lu            = np.zeros((dU))
+        lv            = np.zeros((dV))
         lux           = np.zeros((dU, dX))
         luu           = np.zeros((dU, dU))
+        luv           = np.zeros((dU, dV))
+        lvx           = np.zeros((dV, dX))
+        lvv           = np.zeros((dV, dV))
 
-        stage_term    = 0.5 * np.expand_dims(state_penalty*x, axis=1)\
-                        .T.dot(np.expand_dims(state_penalty*x, axis=1))
-        l1l2_term     = np.sqrt(l21_const + xs_exp.T.dot(xs_exp))
+        stage_term    = xs_exp.T.dot(np.diag(wx)).dot(xs_exp)
 
-        l             = stage_term + l1l2_term
-        lx            = state_penalty * x + state_diff /(l1l2_term)
+        l             = np.sqrt(alpha + stage_term)
+        lx            = (wx * state_diff) / l
+        lxx           = (alpha * wx) / (l ** 3)
+        lxx           = np.diag(lxx)
 
-        # lxx_t1        = l21_const
-        # lxx_t2_top    = np.diag(state_penalty) * l1l2_term ** 3 
-        # lxx_t2_bot    = l1l2_term**3
-        # lxx           = (lxx_t1 + lxx_t2_top)/lxx_t2_bot
+        print('l: {}, \nlx: {}, \nlxx: {}'.format(l, lx, lxx))
 
-        # lxx           = (l21_const + state_penalty * l1l2_term)/(l1l2_term)
-        # stage_term    = 0.5 * LA.norm(state_penalty * x)**2
-        # l1l2_term     = np.sqrt(l21_const +   xs_exp.T.dot(xs_exp))
-        # l             = stage_term + l1l2_term
-        # lx            = state_penalty * x + state_diff/(l1l2_term) 
-        lxx_t1        = np.diag(state_penalty)
-        lxx_t2_top    = l1l2_term - (state_diff**2) / l1l2_term
-        lxx_t2_bot    = state_diff**2
-        lxx_t2        = lxx_t2_top / lxx_t2_bot
-        lxx           = lxx_t1 + np.diag(lxx_t2.squeeze())
-        # print('lxx: ', lxx, '\n', 'lx: ', lx)
-
-        return l, lx, lu, lux, lxx,  luu
+        return l, lx, lu, lv, lux, lvx, lxx, luu, luv, lvv

@@ -26,22 +26,26 @@ class CostSum(Cost):
         dV            = self.config['agent']['dV']
         dX            = self.config['agent']['dX']
 
-        l, lx, lu, lux, lxx,  luu = self._costs[0].eval(**kwargs)
+        l, lx, lu, lv, lux, lvx, lxx, luu, luv, lvv \
+                = self._costs[0].eval(**kwargs)
 
         # Compute weighted sum of each cost value and derivatives.
         weight = self._weights[0]
 
         for i in range(1, len(self._costs)):
-            pl, plx, plu, plux, plxx, pluu  = self._costs[i].eval(**kwargs)
+            l, lx, lu, lv, lux, lvx, lxx, luu, luv, lvv \
+                 = self._costs[i].eval(**kwargs)
             weight = self._weights[i]
 
             l   = l + pl * weight
             lx  = lx + plx * weight
             lu  = lu + plu * weight
-            lxx = lxx + plxx * weight
+            lv  = lv + plv * weight
             luu = luu + pluu * weight
-            lux = lux + plux * weight  
+            luv = luv + pluv * weight
+            lvv = lvv + plvv * weight
+            lux = lux + plux * weight 
+            lvx = lvx + plvx * weight  
+            lxx = lxx + plxx * weight
 
-        # print('state l: ', l)
-
-        return l, lx, lu, lux, lxx,  luu
+        return l, lx, lu, lv, lux, lvx, lxx, luu, luv, lvv

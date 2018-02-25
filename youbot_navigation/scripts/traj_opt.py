@@ -545,7 +545,7 @@ class TrajectoryOptimization(Dynamics):
             traj_info.state[t+1,:]      = traj_info.state[t] \
                                             + delta_t * self.get_state_rhs_eq(bdyn, traj_info.state[t], traj_info.action[t])
 
-            # set ubar_i = u_i, x_bar_i = x_i
+            # set ubar_i = u_i, x_bar_i = x_i # pg 113 DDp Book
             traj_info.nom_action[t]   = traj_info.action[t]
             traj_info.nom_state[t]    = traj_info.state[t]
 

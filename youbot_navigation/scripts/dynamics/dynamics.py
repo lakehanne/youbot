@@ -52,9 +52,6 @@ class Dynamics(MassMaker):
 
         self.__dict__.update(mat_maker.__dict__)
         self.model_rcvr       = ModelStatesReceiver()
-        num_samples = config['agent']['sample_length']
-
-        # self.costs = config['all_costs']['costs']['type'](config['all_costs']['costs'])
 
     def odom_cb(self, odom):
         self.odom = odom
@@ -207,50 +204,36 @@ class Dynamics(MassMaker):
         traj_info =  TrajectoryInfo(config)
         cost_info =  CostInfo(config)
 
-        cost_sum = CostSum(config)  # note that config is global to scope
+        cost_sum = CostSum(config)  
+
+        wu       = config['agent']['wu']
+        wv       = config['agent']['wv']
+        wx       = config['agent']['wx']
 
         model_states = self.model_rcvr.model_states
-
         pose = model_states.pose
-        # print('pose: ', pose)
-        # twist = model_states.twist
-
-        # world_pose  = [pose[1].position.x, pose[1].position.y, pose[1].position.z,
-        #                 pose[1].orientation.x, pose[1].orientation.y, pose[1].orientation.z,
-        #                 pose[1].orientation.w]
-        # world_twist = [twist[1].linear.x, twist[1].linear.y, twist[1].linear.z,
-        #                 twist[1].angular.x, twist[1].angular.y, twist[1].angular.z]
-
-        # youbot_pose = [pose[2].position.x, pose[2].position.y, pose[2].position.z,
-        #                 pose[2].orientation.x, pose[2].orientation.y, pose[2].orientation.z,
-        #                 pose[2].orientation.w]
-        # youbot_twist= [twist[2].linear.x, twist[2].linear.y, twist[2].linear.z,
-        #                 twist[2].angular.x, twist[2].angular.y, twist[2].angular.z]
 
         self.boxtacle_pose  = [pose[-1].position.x, pose[-1].position.y, pose[-1].position.z,
                          pose[-1].orientation.x, pose[-1].orientation.y, pose[-1].orientation.z,
                          pose[-1].orientation.w]
-        # boxtacle_twist = [twist[3].linear.x, twist[3].linear.y, twist[3].linear.z,
-        #                 twist[3].angular.x, twist[3].angular.y, twist[3].angular.z]                 
-
         _, _, robot_angle = euler_from_quaternion(self.boxtacle_pose[3:])
         self.goal_state  = np.array(self.boxtacle_pose[:2] + [robot_angle])
         self.goal_state[0] -= 0.456 # account for box origin so robot doesn't push box when we get to final time step
 
         # see generalized ILQG Summary page
-        k = range(0, T)
-        K = len(k)
+        k       = range(0, T)
+        K       = len(k)
         delta_t = T/(K-1)
-        t = [(_+1-1)*delta_t for _ in k]
+        t       = [(_+1-1)*delta_t for _ in k]
 
         # allocate space for local controls
         u       = np.zeros((T, dU))
         v       = np.zeros((T, dV))
         x       = np.zeros((T, dX))
 
-        delta_u = np.zeros_like(u)
-        delta_v = np.zeros_like(v)
-        delta_x = np.zeros_like(x)
+        del_u   = np.zeros_like(u)
+        del_v   = np.zeros_like(v)
+        del_x   = np.zeros_like(x)
 
         u_bar   = np.zeros_like(u) #np.random.randint(low=1, high=10, size=(T, dU))  #
         v_bar   = generate_noise(T, dV, self.agent)
@@ -278,7 +261,6 @@ class Dynamics(MassMaker):
         lvx      = np.zeros((T, dV, dX))
         lux      = np.zeros((T, dU, dX))
 
-       # apply u_bar to deterministic system
         for k in range(K):
             # get body dynamics. Note that some of these are time varying parameters
             body_dynamics = self.assemble_dynamics()
@@ -294,28 +276,29 @@ class Dynamics(MassMaker):
             f           = body_dynamics.f
 
             # calculate the forward dynamics equation
-            Minv            = np.linalg.inv(M)
-            rhs             = - Minv.dot(C).dot(x_bar[k,:]) - Minv.dot(B.T).dot(S.dot(f)) \
+            Minv        = np.linalg.inv(M)
+            rhs         = - Minv.dot(C).dot(x_bar[k,:]) - Minv.dot(B.T).dot(S.dot(f)) \
                               + Minv.dot(B.T).dot(u_bar[k, :])/self.wheel['radius']
 
-            rhsv            = - Minv.dot(C).dot(x_bar[k,:]) - Minv.dot(B.T).dot(S.dot(f)) \
+            rhsv        = - Minv.dot(C).dot(x_bar[k,:]) - Minv.dot(B.T).dot(S.dot(f)) \
                             + Minv.dot(B.T).dot(v_bar[k, :])/self.wheel['radius']                              
             # print('rhs: ', rhs, 'xbar: ')
             if k == 0:
-                x_bar[k]    = delta_t * rhs
+                x_bar[k]= delta_t * rhs
 
             # step 2.1: get linearized dynamics
-            BBT             = B.dot(B.T)
-            Inv_BBT         = np.linalg.inv(BBT)
-            lhs             = Inv_BBT.dot(self.wheel['radius'] * B)
+            BBT         = B.dot(B.T)
+            Inv_BBT     = np.linalg.inv(BBT)
+            lhs         = Inv_BBT.dot(self.wheel['radius'] * B)
 
             # step 2.2: set up nonlinear dynamics at k
-            u[k,:]          = lhs.dot(M.dot(qaccel) + C.dot(qvel) + \
+            u[k,:]      = lhs.dot(M.dot(qaccel) + C.dot(qvel) + \
                                     B.T.dot(S).dot(f)).squeeze()
+            v[k,:]      = generate_noise(1, dV, self.agent)
 
             # inject noise to the states
-            x[k,:]          = q + x_noise[k, :] if noisy else q
-            rhs             = - Minv.dot(C).dot(x[k,:]) - Minv.dot(B.T).dot(S.dot(f)) \
+            x[k,:]      = q + x_noise[k, :] if noisy else q
+            rhs         = - Minv.dot(C).dot(x[k,:]) - Minv.dot(B.T).dot(S.dot(f)) \
                                  + Minv.dot(B.T).dot(u[k,:])/self.wheel['radius']
 
             if k < K-1:
@@ -327,30 +310,31 @@ class Dynamics(MassMaker):
             fu[k,:,:]   = -(delta_t * self.wheel['radius']) * Minv.dot(B.T)
 
             #step 2.3 set up state-action deviations
-            delta_x[k,:]     = x[k,:] - x_bar[k,:]
-            delta_u[k,:]     = u[k,:] - u_bar[k,:]
-            delta_x_star     = self.goal_state
+            del_x[k,:]     = x[k,:] - x_bar[k,:]
+            del_u[k,:]     = u[k,:] - u_bar[k,:]
+            del_v[k,:]     = v[k,:] - v_bar[k,:]
+            del_x_star     = self.goal_state
                
             # get nominal state costs 
             l_nom[k] = cost_sum.eval(x=x_bar[k,:], \
-                                    xstar=delta_x_star, \
+                                    xstar=del_x_star, \
                                     u=u_bar[k,:], \
                                     l21_const=self.l21_const, \
                                     state_penalty=self.state_penalty, \
-                                    action_penalty=self.action_penalty)[0]
+                                    wu=wu)[0]
 
             # get nonlinear state cost derivatives
             l_nlnr[k], lx[k], lu[k], \
             lux[k], lxx[k], luu[k] = cost_sum.eval(x=x[k,:], \
-                                    xstar=delta_x_star, \
+                                    xstar=del_x_star, \
                                     u=u[k,:], \
                                     l21_const=self.l21_const, \
                                     state_penalty=self.state_penalty, \
-                                    action_penalty=self.action_penalty)
+                                    wu=wu)
             
             # form l approximation # eq 4 in iros 18 paper
-            left_mat  = np.c_[1, self.exp_arr(delta_x[k], 1).T, \
-                                self.exp_arr(delta_u[k], 1).T]               
+            left_mat  = np.c_[1, self.exp_arr(del_x[k], 1).T, \
+                                self.exp_arr(del_u[k], 1).T]               
             inner_mat = np.r_[
                     np.c_[l_nom[k], self.exp_arr(lx[k], 1).T, self.exp_arr(lu[k], 1).T],
                     np.c_[self.exp_arr(lx[k], 1), lxx[k], lux[k].T],
@@ -368,8 +352,8 @@ class Dynamics(MassMaker):
             traj_info.state[k,:]         = x[k,:]
             traj_info.nom_action[k,:]    = u_bar[k,:]
             traj_info.nom_state[k,:]     = x_bar[k,:]
-            traj_info.delta_action[k,:]  = delta_u[k,:]
-            traj_info.delta_state[k,:]   = delta_x[k,:]
+            traj_info.delta_action[k,:]  = del_u[k,:]
+            traj_info.delta_state[k,:]   = del_x[k,:]
 
             cost_info.l[k]   = l[k]
             cost_info.lu[k]  = lu[k]
