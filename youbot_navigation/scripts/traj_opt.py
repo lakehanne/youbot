@@ -345,7 +345,7 @@ class TrajectoryOptimization(Dynamics):
     def backward(self, sample_info, noisy=False):
         T  = self.T
         dU = self.dU
-        dV = self.d
+        dV = self.dV
         dX = self.dX
 
         cost_info = sample_info.cost_info
@@ -359,7 +359,7 @@ class TrajectoryOptimization(Dynamics):
 
             for t in range (T-1, -1, -1):
 
-                cost_info.Qnut[t,:]   = cost_info.l[t]
+                cost_info.Qnut[t]   = cost_info.l[t]
                 cost_info.Qx[t,:]     = cost_info.lx[t]
                 cost_info.Qu[t,:]     = cost_info.lu[t]
                 cost_info.Quu[t,:,:]  = cost_info.luu[t]

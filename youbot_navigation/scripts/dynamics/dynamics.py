@@ -295,7 +295,7 @@ class Dynamics(MassMaker):
             # step 2.2: set up nonlinear dynamics at k
             u[k,:]      = lhs.dot(M.dot(qaccel) + C.dot(qvel) + \
                                     B.T.dot(S).dot(f)).squeeze()
-            v[k,:]      = u[k,:] + generate_noise(1, dV, self.agent)
+            v[k,:]      = u[k,:] + v_bar[k]#generate_noise(1, dV, self.agent)
 
             # inject noise to the states
             x[k,:]      = q + x_noise[k, :] if noisy else q
@@ -340,7 +340,9 @@ class Dynamics(MassMaker):
 
             l[k]   = 0.5 * left_mat.dot(inner_mat).dot(right_mat)#.squeeze()
 
-            print('ldyn: ', l[k])
+            # print('v:\n {}, \nvbar:\n {}, \ndelv:\n {}'
+            #     .format(v[k], v_bar[k], del_v[k]))
+            # print('l: ', l[k])
 
             # store away stage terms
             traj_info.fx[k,:]            = fx[k,:]
