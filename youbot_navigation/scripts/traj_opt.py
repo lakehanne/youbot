@@ -106,7 +106,7 @@ class TrajectoryOptimization(Dynamics):
 
         self.pcl_rcvr = PointCloudsReceiver(rate)
 
-    def get_state_rhs_eq(bdyn, x, u):
+    def get_state_rhs_eq(self, bdyn, x, u):
         M, C, B, S, f = bdyn.M, bdyn.C, bdyn.B, bdyn.S, bdyn.f
         Minv          = np.linalg.inv(M)
         rhs  = - Minv.dot(C).dot(x) - Minv.dot(B.T).dot(S.dot(f)) \
@@ -237,8 +237,8 @@ class TrajectoryOptimization(Dynamics):
 
                 cost_change = cost_change.squeeze() + 1e-6 # to remove -0
 
-                rospy.loginfo('cost_change: {}, Jprev; {}, Jcur: {}'
-                    .format(cost_change, J_prev_traj, J_curr_traj))
+                rospy.loginfo('cost_change_scale: {} cost_change: {}, Jprev; {}, Jcur: {}'
+                    .format(cost_change_scale, cost_change, J_prev_traj, J_curr_traj))
             else: #set an arbitrary value for cost change
                 cost_change = -0.5
 
@@ -525,15 +525,6 @@ class TrajectoryOptimization(Dynamics):
         traj_info.state[0] = traj_info.nom_state[0]
 
         for t in range(1, T-1):
-            # update the nominal action that was assumed
-            # traj_info.nom_action[t,:] = traj_info.nom_action[t,:] \
-            #                                     + alpha * traj_info.gu[t, :] \
-            #                                     + traj_info.Gu[t, :].dot(traj_info.nom_state[t,:])
-
-            # traj_info.delta_action[t,:] = traj_info.delta_action[t,:] \
-            #                                     + alpha * traj_info.gu[t, :] \
-            #                                     + traj_info.Gu[t, :].dot(traj_info.delta_state[t,:])
-            
             traj_info.action[t,:]       = traj_info.action[t,:] \
                                                 + alpha * traj_info.gu[t, :] \
                                                 + traj_info.Gu[t, :].dot(traj_info.state[t,:])
