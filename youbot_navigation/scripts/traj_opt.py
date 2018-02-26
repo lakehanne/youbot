@@ -185,6 +185,8 @@ class TrajectoryOptimization(Dynamics):
         wrench_base = Wrench()
         base_angle = Twist()
 
+        goal_sign = np.sign(self.goal_state)
+
         run = True
         # while eta >= stop_cond:
         while run:
@@ -270,6 +272,10 @@ class TrajectoryOptimization(Dynamics):
                     # F = (1/r) * B^T \tau - B^T S f
                     forces = (1/self.wheel['radius']) * bdyn.B.T.dot(torques) \
                                 - bdyn.B.T.dot(bdyn.S.dot(bdyn.f))
+
+                    # take care of directions in which we want our robot to move
+                    # forces *= goal_sign
+
                     # get laser readings
                     self.pcl_rcvr.laser_listener()
                     # print('points: {}, pts len: {}'.format(self.pcl_rcvr.points, len(self.pcl_rcvr.points)))
@@ -285,6 +291,7 @@ class TrajectoryOptimization(Dynamics):
                             wrench_base.force.y, wrench_base.torque.z))
 
                     state_change = bdyn.q - self.goal_state
+                    rospy.loginfo("\ntorques: {}".format(torques))
                     rospy.loginfo("\nx:\t {}, \ndelx:\t {}, \nq:\t {}"
                         ", \nq*:\t {}".format(
                         new_sample_info.traj_info.state[t,:],
@@ -416,9 +423,9 @@ class TrajectoryOptimization(Dynamics):
                             cost_info.Qvv_tilde[t])
                 # Compute Cholesky decomposition of Q function action component.
                 try:
-                    U = sp.linalg.cholesky(cost_info.Quu[t,:,:])
+                    U = sp.linalg.cholesky(cost_info.Quu_tilde[t,:,:])
                     L = U.T
-                    V = sp.linalg.cholesky(cost_info.Qvv[t,:,:])
+                    V = sp.linalg.cholesky(cost_info.Qvv_tilde[t,:,:])
                     Lv = V.T
                     # U_tilde = sp.linalg.cholesky(cost_info.Quu_tilde[t,:,:])
                     # L_tilde = U_tilde.T
@@ -434,12 +441,12 @@ class TrajectoryOptimization(Dynamics):
                             U, sp.linalg.solve_triangular(L, np.eye(dU), lower=True) )
                 invQvv = sp.linalg.solve_triangular(
                             V, sp.linalg.solve_triangular(Lv, np.eye(dV), lower=True) )
-                Ku     = np.linalg.pinv(cost_info.Quu[t] 
-                            - cost_info.Quu[t].dot(invQuu.dot(cost_info.Quv[t].dot(\
+                Ku     = np.linalg.pinv(cost_info.Quu_tilde[t] 
+                            - cost_info.Quu_tilde[t].dot(invQuu.dot(cost_info.Quv[t].dot(\
                                 invQvv[t]).dot(cost_info.Quv[t].T)))
                             )
-                Kv     = np.linalg.pinv(cost_info.Qvv[t] 
-                            - cost_info.Qvv[t].dot(invQvv.dot(cost_info.Quv[t].T.dot(\
+                Kv     = np.linalg.pinv(cost_info.Qvv_tilde[t] 
+                            - cost_info.Qvv_tilde[t].dot(invQvv.dot(cost_info.Quv[t].T.dot(\
                                 invQuu[t]).dot(cost_info.Quv[t])))
                             )                
                 gu   = Ku.dot(cost_info.Quv[t].dot(invQvv).dot(cost_info.Qv[t]) \
