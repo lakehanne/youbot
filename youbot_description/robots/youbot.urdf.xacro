@@ -65,9 +65,9 @@
   </xacro:hokuyo_urg04_laser>
 
   <!-- kinect2 camera from Jennifer Buehler -->
-  <xacro:kinect2 name="kinect_camera_rgb" parent="base_link" >
+<!--   <xacro:kinect2 name="kinect_camera_rgb" parent="base_link" >
     <origin xyz="${0.4} 0 0.42" rpy="0 ${M_PI/10} 0" />
-  </xacro:kinect2>
+  </xacro:kinect2> -->
 
   <!-- World obstacle -->
 <!--   <xacro:youbot_obstacle name="youbot_obstacle" parent="youbot_obstacle_right_corner_wall" >

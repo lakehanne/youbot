@@ -23,6 +23,7 @@ from geometry_msgs.msg import Twist, \
         Pose, PoseStamped, Quaternion
 from tf.transformations import euler_from_quaternion
 
+import scipy.ndimage as sp_ndimage
 # fix random seed
 np.random.seed(0)
 
@@ -192,6 +193,18 @@ class Dynamics(MassMaker):
     def exp_arr(self, array, dim):
         return np.expand_dims(array, axis=dim)
 
+    def get_disturbance(T, dU, gauss=True, rand_walk=True):
+        if T != 1:
+            assert "The disturbance function does not support multidim T as yet"
+        noise = np.random.randn(T, dU)
+        if gauss:
+            gauss_var = 2
+            noise = sp_ndimage.filters.gaussian_filter(noise, gauss_var)
+        if rand_walk:
+            noise_cum = np.cumsum(noise, axis=1)
+            noise = noise_cum**2
+        return noise
+
     def get_samples(self, noisy=False):
         """
             Get N samples of states and controls from the robot
@@ -209,7 +222,7 @@ class Dynamics(MassMaker):
         wu       = config['all_costs']['wu']
         wv       = config['all_costs']['wv']
         wx       = config['all_costs']['wx']
-        gamma       = config['all_costs']['gamma']
+        gamma    = config['all_costs']['gamma']
 
         ms       = self.model_rcvr.model_states
         pose     = ms.pose
@@ -295,7 +308,8 @@ class Dynamics(MassMaker):
             # step 2.2: set up nonlinear dynamics at k
             u[k,:]      = lhs.dot(M.dot(qaccel) + C.dot(qvel) + \
                                     B.T.dot(S).dot(f)).squeeze()
-            v[k,:]      = u[k,:] + v_bar[k]#generate_noise(1, dV, self.agent)
+            # this is already initialized to a zero mean var 2 rand walk vector
+            # v[k,:]      = u[k,:] + v_bar[k]#generate_noise(1, dV, self.agent)
 
             # inject noise to the states
             x[k,:]      = q + x_noise[k, :] if noisy else q

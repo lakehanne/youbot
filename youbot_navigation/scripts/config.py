@@ -22,13 +22,13 @@ config = {
 	'agent': {
 		'goal_state': np.asarray([1.3, 0.8, -2.752012201858897e-19]).T,
 		# 'goal_state': np.asarray([0.82452343,  0.59753333,  0.07282408]).T,
-		'T':  150,
+		'T':  500,
 		'dU': 4,
 		'dV': 4,
 		'dX': 3, # includes velocity terms
 		'dO': 3,
 		'TOL': 1e-2, # tolerance for stopping DP algorithm
-		'alpha': 1.0,
+		'linesearch_param': 1.0,
 		'conditions': 4,
 		'sample_length': 30,  # number of samples used in cost-to-go function
 		'delta': 1e-4, # initial value of step size used in adjusting delta
@@ -61,9 +61,9 @@ config = {
 	    'costs': [{'type': CostAction, 'wu': np.array([1, 1])}, {'type': CostState}],
 	    'weights': [1.0, 1.0],
 	    'mode': 'robust',
-	    'gamma': 0,
+	    'gamma': 1e-5,
 	    'alpha': 0.0001,
-		'wu': np.array([0.001, 0.001, 0.001, 0.001]),
+		'wu': np.array([0.0001, 0.0001, 0.0001, 0.0001]),
 		'wv': np.array([1, 1, 1, 1]),
 		'wx': np.array([1, 1, 1]),
 	},

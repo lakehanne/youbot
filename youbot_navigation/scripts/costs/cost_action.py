@@ -40,7 +40,7 @@ class CostAction(Cost):
 
         l             = (alpha**2) * (np.cosh(wu_exp.T.dot(u_exp)) \
                         - gamma*np.cosh(wv_exp.T.dot(v_exp)))
-        l             = l.squeeze() if l.ndim > 1 else None
+        l             = l.squeeze() if l.ndim > 1 else l
         
         lu            = (alpha**2) * wu * np.sinh(wu*u)
         lv            = -gamma*(alpha**2) * wv * np.sinh(wv*v)
