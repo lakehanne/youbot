@@ -291,19 +291,19 @@ class TrajectoryOptimization(Dynamics):
                     wrench_base.force.y =  forces[1] * scale_factor
                     wrench_base.torque.z = forces[2] * scale_factor
 
-                    # rospy.loginfo('Fx: %4f, Fy: %4f, Ftheta: %4f' % (wrench_base.force.x,
-                    #         wrench_base.force.y, wrench_base.torque.z))
+                    rospy.loginfo('Fx: %4f, Fy: %4f, Ftheta: %4f' % (wrench_base.force.x,
+                            wrench_base.force.y, wrench_base.torque.z))
 
                     state_change = bdyn.q - self.goal_state
                     # rospy.loginfo("\ntorques: {}".format(torques))
-                    # rospy.loginfo("\nx:\t {}, \ndelx:\t {}, \nu:\t {}, \ndelu:\t {},\nq:\t {}"
-                    #     ", \nq*:\t {}".format(
-                    #     new_sample_info.traj_info.state[t,:],
-                    #     new_sample_info.traj_info.delta_state[t,:], 
-                    #     new_sample_info.traj_info.action[t,:],
-                    #     new_sample_info.traj_info.delta_action[t,:], 
-                    #     bdyn.q,
-                    #     self.goal_state))
+                    rospy.loginfo("\nx:\t {}, \ndelx:\t {}, \nu:\t {}, \ndelu:\t {},\nq:\t {}"
+                        ", \nq*:\t {}".format(
+                        new_sample_info.traj_info.state[t,:],
+                        new_sample_info.traj_info.delta_state[t,:], 
+                        new_sample_info.traj_info.action[t,:],
+                        new_sample_info.traj_info.delta_action[t,:], 
+                        bdyn.q,
+                        self.goal_state))
                     # send the torques to the base footprint
                     send_body_wrench('base_footprint', reference_frame,
                                                     None, wrench_base, start_time,

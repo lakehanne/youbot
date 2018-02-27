@@ -22,7 +22,7 @@ config = {
 	'agent': {
 		'goal_state': np.asarray([1.3, 0.8, -2.752012201858897e-19]).T,
 		# 'goal_state': np.asarray([0.82452343,  0.59753333,  0.07282408]).T,
-		'T':  500,
+		'T':  300,
 		'dU': 4,
 		'dV': 4,
 		'dX': 3, # includes velocity terms
@@ -61,7 +61,7 @@ config = {
 	    'costs': [{'type': CostAction, 'wu': np.array([1, 1])}, {'type': CostState}],
 	    'weights': [1.0, 1.0],
 	    'mode': 'robust',
-	    'gamma': 1e-5,
+	    'gamma': 5,
 	    'alpha': 0.0001,
 		'wu': np.array([0.0001, 0.0001, 0.0001, 0.0001]),
 		'wv': np.array([1, 1, 1, 1]),
