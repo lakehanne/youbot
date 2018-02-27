@@ -241,7 +241,7 @@ class TrajectoryOptimization(Dynamics):
                 DeltaJ_rho = J_curr_rho.squeeze() + 1e-6#(J_prev_rho - J_curr_rho).squeeze() + 1e-6 # to remove -0
                 DeltaJ   = (J_curr - J_prev ).squeeze()
 
-                J_diff   = DeltaJ#/DeltaJ_rho
+                J_diff   = DeltaJ/DeltaJ_rho
 
                 # rospy.loginfo('DeltaJ_rho: {} J_diff: {}, Jprev; {}, Jcur: {}'
                 #     .format(DeltaJ_rho, J_diff, J_prev, J_curr))
@@ -278,32 +278,31 @@ class TrajectoryOptimization(Dynamics):
                                 - bdyn.B.T.dot(bdyn.S.dot(bdyn.f))
 
                     # take care of directions in which we want our robot to move
-                    # forces *= goal_sign
+                    forces *= goal_sign
 
                     # get laser readings
                     self.pcl_rcvr.laser_listener()
                     # print('points: {}, pts len: {}'.format(self.pcl_rcvr.points, len(self.pcl_rcvr.points)))
                     #  reset points
                     self.pcl_rcvr.points = []
-                    scale_factor = 5
+                    gain = 8
 
-                    wrench_base.force.x =  forces[0] * scale_factor
-                    wrench_base.force.y =  forces[1] * scale_factor
-                    wrench_base.torque.z = forces[2] * scale_factor
+                    wrench_base.force.x =  forces[0] * gain
+                    wrench_base.force.y =  forces[1] * gain
+                    wrench_base.torque.z = forces[2] * gain
 
-                    # rospy.loginfo('Fx: %4f, Fy: %4f, Ftheta: %4f' % (wrench_base.force.x,
-                    #         wrench_base.force.y, wrench_base.torque.z))
+                    rospy.loginfo('Fx: %4f, Fy: %4f, Ftheta: %4f' % (wrench_base.force.x,
+                            wrench_base.force.y, wrench_base.torque.z))
 
                     state_change = bdyn.q - self.goal_state
-                    # rospy.loginfo("\ntorques: {}".format(torques))
-                    # rospy.loginfo("\nx:\t {}, \ndelx:\t {}, \nu:\t {}, \ndelu:\t {},\nq:\t {}"
-                    #     ", \nq*:\t {}".format(
-                    #     new_sample_info.traj_info.state[t,:],
-                    #     new_sample_info.traj_info.delta_state[t,:], 
-                    #     new_sample_info.traj_info.action[t,:],
-                    #     new_sample_info.traj_info.delta_action[t,:], 
-                    #     bdyn.q,
-                    #     self.goal_state))
+                    rospy.loginfo("\nv:\t {}, \nv_bar:\t {}, \ndelv:\t {}, \nu:\t {},"
+                        "\nq:\t {}, \nq*:\t {}".format(
+                        new_sample_info.traj_info.act_adv[t,:],
+                        new_sample_info.traj_info.nom_act_adv[t,:], 
+                        new_sample_info.traj_info.delta_act_adv[t,:], 
+                        new_sample_info.traj_info.action[t,:],
+                        bdyn.q,
+                        self.goal_state))
                     # send the torques to the base footprint
                     send_body_wrench('base_footprint', reference_frame,
                                                     None, wrench_base, start_time,
@@ -322,7 +321,7 @@ class TrajectoryOptimization(Dynamics):
                         run = False
                         break
 
-                    # rospy.loginfo('Eta: {}'.format(abs(gs-cs)))
+                    rospy.loginfo('Eta: {}'.format(abs(gs-cs)))
 
                     if save:
                         with open(savefile, 'ab') as f:
