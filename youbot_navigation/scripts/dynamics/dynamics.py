@@ -252,6 +252,7 @@ class Dynamics(MassMaker):
         u_bar   = np.zeros_like(u) #np.random.randint(low=1, high=10, size=(T, dU))  #
         u_bar[:,] = config['trajectory']['init_action']
         v_bar   = generate_noise(T, dV, self.agent)
+        v       = generate_noise(T, dV, self.agent)
         # initialize u_bar
         x_bar   = np.zeros_like(x)
 
@@ -292,13 +293,13 @@ class Dynamics(MassMaker):
             # calculate the forward dynamics equation
             Minv        = np.linalg.inv(M)
             rhs         = - Minv.dot(C).dot(x_bar[k,:]) - Minv.dot(B.T).dot(S.dot(f)) \
-                              + Minv.dot(B.T).dot(u_bar[k, :])/self.wheel['radius']
-
-            rhsv        = - Minv.dot(C).dot(x_bar[k,:]) - Minv.dot(B.T).dot(S.dot(f)) \
-                            + Minv.dot(B.T).dot(v_bar[k, :])/self.wheel['radius']                              
-            # print('rhs: ', rhs, 'xbar: ')
+                              + Minv.dot(B.T).dot(u_bar[k, :] n- gamma * v_bar)/self.wheel['radius']                            
+            
             if k == 0:
                 x_bar[k]= delta_t * rhs
+
+            if k < K - 1:  
+                x_bar[k+1,:]= x_bar[k,:] +  delta_t * rhs
 
             # step 2.1: get linearized dynamics
             BBT         = B.dot(B.T)
@@ -307,17 +308,16 @@ class Dynamics(MassMaker):
 
             # step 2.2: set up nonlinear dynamics at k
             u[k,:]      = lhs.dot(M.dot(qaccel) + C.dot(qvel) + \
-                                    B.T.dot(S).dot(f)).squeeze()
+                                    B.T.dot(S).dot(f)).squeeze() + gamma * v[k,:]
             # this is already initialized to a zero mean var 2 rand walk vector
-            # v[k,:]      = u[k,:] + v_bar[k]#generate_noise(1, dV, self.agent)
+            # v[k,:]      = u[k,:] #+ v_bar[k]#generate_noise(1, dV, self.agent)
 
             # inject noise to the states
             x[k,:]      = q + x_noise[k, :] if noisy else q
-            rhs         = - Minv.dot(C).dot(x[k,:]) - Minv.dot(B.T).dot(S.dot(f)) \
-                                 + Minv.dot(B.T).dot(u[k,:])/self.wheel['radius']
+            rhs         = - Minv.dot(C).dot(x[k,:]) - Minv.dot(B.T).dot(S).dot(f) \
+                                 + Minv.dot(B.T).dot(u[k,:] - gamma * v[k,:])/self.wheel['radius']
 
             if k < K-1:
-                x_bar[k+1,:]    = x_bar[k,:] +  delta_t * rhs
                 x[k+1,:]        = x[k,:] +  delta_t * rhs
 
             # calculate the jacobians
@@ -353,10 +353,6 @@ class Dynamics(MassMaker):
             right_mat  = left_mat.T    
 
             l[k]   = 0.5 * left_mat.dot(inner_mat).dot(right_mat)#.squeeze()
-
-            # print('v:\n {}, \nvbar:\n {}, \ndelv:\n {}'
-            #     .format(v[k], v_bar[k], del_v[k]))
-            # print('l: ', l[k])
 
             # store away stage terms
             traj_info.fx[k,:]            = fx[k,:]
