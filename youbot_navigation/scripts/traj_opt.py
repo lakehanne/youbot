@@ -190,7 +190,7 @@ class TrajectoryOptimization(Dynamics):
         run = True
 
         while run:
-            print('first sample: ', sample_info.cost_info.l[80])
+            # print('first sample: ', sample_info.cost_info.l[80])
             prev_sample_info = self.backward(sample_info, noisy)
 
             new_sample_info  = self.forward(prev_sample_info, noisy)
@@ -295,12 +295,22 @@ class TrajectoryOptimization(Dynamics):
                             wrench_base.force.y, wrench_base.torque.z))
 
                     state_change = bdyn.q - self.goal_state
+<<<<<<< HEAD
                     rospy.loginfo("\nv:\t {}, \nv_bar:\t {}, \ndelv:\t {}, \nu:\t {},"
                         "\nq:\t {}, \nq*:\t {}".format(
                         new_sample_info.traj_info.act_adv[t,:],
                         new_sample_info.traj_info.nom_act_adv[t,:], 
                         new_sample_info.traj_info.delta_act_adv[t,:], 
                         new_sample_info.traj_info.action[t,:],
+=======
+                    # rospy.loginfo("\ntorques: {}".format(torques))
+                    rospy.loginfo("\nx:\t {}, \ndelx:\t {}, \nu:\t {}, \ndelu:\t {},\nq:\t {}"
+                        ", \nq*:\t {}".format(
+                        new_sample_info.traj_info.state[t,:],
+                        new_sample_info.traj_info.delta_state[t,:], 
+                        new_sample_info.traj_info.action[t,:],
+                        new_sample_info.traj_info.delta_action[t,:], 
+>>>>>>> b97b89ced2eb23fce32d36b9cd287f00dea1e5b2
                         bdyn.q,
                         self.goal_state))
                     # send the torques to the base footprint

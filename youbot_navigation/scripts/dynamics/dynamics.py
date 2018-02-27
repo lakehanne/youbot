@@ -16,7 +16,7 @@ from scripts.algorithm_utils import TrajectoryInfo, \
                             generate_noise, CostInfo
 from scripts.subscribers import KinectReceiver, \
                                 ModelStatesReceiver
-from scripts.costs import CostSum, CostAction, CostState                              
+from scripts.costs import CostSum, CostAction, CostState
 
 from multiprocessing.pool import ThreadPool
 from geometry_msgs.msg import Twist, \
@@ -97,8 +97,8 @@ class Dynamics(MassMaker):
         y     = self.odom.pose.pose.position.y
 
         # quaternion = [self.odom.pose.pose.orientation.w, self.odom.pose.pose.orientation.x,
-        #                 self.odom.pose.pose.orientation.y,self.odom.pose.pose.orientation.z] 
-        # see https://answers.ros.org/question/69754/quaternion-transformations-in-python/      
+        #                 self.odom.pose.pose.orientation.y,self.odom.pose.pose.orientation.z]
+        # see https://answers.ros.org/question/69754/quaternion-transformations-in-python/
         quaternion = [self.odom.pose.pose.orientation.x, self.odom.pose.pose.orientation.y,
                         self.odom.pose.pose.orientation.z, self.odom.pose.pose.orientation.w]
         _, _, theta  = euler_from_quaternion(quaternion, axes='sxyz')
@@ -217,7 +217,7 @@ class Dynamics(MassMaker):
         traj_info =  TrajectoryInfo(config)
         cost_info =  CostInfo(config)
 
-        cost_sum = CostSum(config)  
+        cost_sum = CostSum(config)
 
         wu       = config['all_costs']['wu']
         wv       = config['all_costs']['wv']
@@ -293,13 +293,13 @@ class Dynamics(MassMaker):
             # calculate the forward dynamics equation
             Minv        = np.linalg.inv(M)
             rhs         = - Minv.dot(C).dot(x_bar[k,:]) - Minv.dot(B.T).dot(S.dot(f)) \
-                              + Minv.dot(B.T).dot(u_bar[k, :])/self.wheel['radius']
+                              + Minv.dot(B.T).dot(u_bar[k, :] n- gamma * v_bar)/self.wheel['radius']
 
-            rhsv        = - Minv.dot(C).dot(x_bar[k,:]) - Minv.dot(B.T).dot(S.dot(f)) \
-                            + Minv.dot(B.T).dot(v_bar[k, :])/self.wheel['radius']                              
-            # print('rhs: ', rhs, 'xbar: ')
             if k == 0:
                 x_bar[k]= delta_t * rhs
+
+            if k < K - 1:
+                x_bar[k+1,:]= x_bar[k,:] +  delta_t * rhs
 
             # step 2.1: get linearized dynamics
             BBT         = B.dot(B.T)
@@ -308,17 +308,16 @@ class Dynamics(MassMaker):
 
             # step 2.2: set up nonlinear dynamics at k
             u[k,:]      = lhs.dot(M.dot(qaccel) + C.dot(qvel) + \
-                                    B.T.dot(S).dot(f)).squeeze()
+                                    B.T.dot(S).dot(f)).squeeze() + gamma * v[k,:]
             # this is already initialized to a zero mean var 2 rand walk vector
-            # v[k,:]      = u[k,:] + v_bar[k]#generate_noise(1, dV, self.agent)
+            # v[k,:]      = u[k,:] #+ v_bar[k]#generate_noise(1, dV, self.agent)
 
             # inject noise to the states
             x[k,:]      = q + x_noise[k, :] if noisy else q
-            rhs         = - Minv.dot(C).dot(x[k,:]) - Minv.dot(B.T).dot(S.dot(f)) \
-                                 + Minv.dot(B.T).dot(u[k,:])/self.wheel['radius']
+            rhs         = - Minv.dot(C).dot(x[k,:]) - Minv.dot(B.T).dot(S).dot(f) \
+                                 + Minv.dot(B.T).dot(u[k,:] - gamma * v[k,:])/self.wheel['radius']
 
             if k < K-1:
-                x_bar[k+1,:]    = x_bar[k,:] +  delta_t * rhs
                 x[k+1,:]        = x[k,:] +  delta_t * rhs
 
             # calculate the jacobians
@@ -332,8 +331,8 @@ class Dynamics(MassMaker):
             del_u[k,:]     = u[k,:] - u_bar[k,:]
             del_v[k,:]     = v[k,:] - v_bar[k,:]
             del_x_star     = self.goal_state
-               
-            # get nominal state costs 
+
+            # get nominal state costs
             l_nom[k] = cost_sum.eval(x=x_bar[k,:], xstar=del_x_star, \
                                      u=u_bar[k,:], v=v_bar[k,:])[0]
 
@@ -341,23 +340,19 @@ class Dynamics(MassMaker):
             l_nlnr[k], lx[k], lu[k], lv[k], lux[k], lvx[k], lxx[k], \
             luu[k], luv[k], lvv[k] = cost_sum.eval(x=x[k,:], xstar=del_x_star, \
                                                  u=u_bar[k,:], v=v_bar[k,:])
-            
+
             # form l approximation # eq 4 in iros 18 paper
             left_mat  = np.c_[1, self.exp_arr(del_x[k], 1).T, \
-                                self.exp_arr(del_u[k], 1).T, self.exp_arr(del_v[k], 1).T]               
+                                self.exp_arr(del_u[k], 1).T, self.exp_arr(del_v[k], 1).T]
             inner_mat = np.r_[
                             np.c_[l_nom[k], self.exp_arr(lx[k], 1).T, self.exp_arr(lu[k], 1).T, self.exp_arr(lv[k], 1).T],
                             np.c_[self.exp_arr(lx[k], 1), lxx[k], lux[k].T, lvx[k].T],
                             np.c_[self.exp_arr(lu[k], 1), lux[k], luu[k],   luv[k]],
                             np.c_[self.exp_arr(lv[k], 1), lvx[k], luv[k].T, lvv[k]]
                         ]
-            right_mat  = left_mat.T    
+            right_mat  = left_mat.T
 
             l[k]   = 0.5 * left_mat.dot(inner_mat).dot(right_mat)#.squeeze()
-
-            # print('v:\n {}, \nvbar:\n {}, \ndelv:\n {}'
-            #     .format(v[k], v_bar[k], del_v[k]))
-            # print('l: ', l[k])
 
             # store away stage terms
             traj_info.fx[k,:]            = fx[k,:]
