@@ -93,6 +93,7 @@ class TrajectoryOptimization(Dynamics):
         self.delta_nut        = config['agent']['delta_nut']
 
         self.config           = config
+        self.pub  = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
 
         rp = rospkg.RosPack()
         self.path = rp.get_path('youbot_navigation')
@@ -106,11 +107,13 @@ class TrajectoryOptimization(Dynamics):
 
         self.pcl_rcvr = PointCloudsReceiver(rate)
 
-    def get_state_rhs_eq(self, bdyn, x, u):
+    def get_state_rhs_eq(self, bdyn, x, u, v):
+        gamma    = self.config['all_costs']['gamma']
+
         M, C, B, S, f = bdyn.M, bdyn.C, bdyn.B, bdyn.S, bdyn.f
         Minv          = np.linalg.inv(M)
         rhs  = - Minv.dot(C).dot(x) - Minv.dot(B.T).dot(S.dot(f)) \
-                         + Minv.dot(B.T).dot(u)/self.wheel['radius']
+                         + Minv.dot(B.T).dot(u - gamma*v)/self.wheel['radius']
 
         return rhs
 
@@ -185,7 +188,8 @@ class TrajectoryOptimization(Dynamics):
 
         goal_sign = np.sign(self.goal_state)
 
-        rho = self.linesearch_param
+        rho = self.linesearch_param        
+        gamma    = self.config['all_costs']['gamma']
 
         run = True
 
@@ -263,56 +267,43 @@ class TrajectoryOptimization(Dynamics):
 
                 for t in range(T):
                     # send the computed torques to ROS
-                    torques = new_sample_info.traj_info.delta_action[t,:]
-                    # torques = new_sample_info.traj_info.action[t,:]
+                    act_u = new_sample_info.traj_info.delta_action[t,:]
+                    act_v = new_sample_info.traj_info.delta_act_adv[t,:]
 
-                    # calculate the genralized force and torques
                     bdyn = self.assemble_dynamics()
-                    theta = torques[-1]  #bdyn.q[-1] #
 
-                    sign_phi = np.sign(self.Phi_dot)
-
-                    # see me notes
                     # F = (1/r) * B^T \tau - B^T S f
-                    forces = (1/self.wheel['radius']) * bdyn.B.T.dot(torques) \
+                    forces = (1/self.wheel['radius']) * bdyn.B.T.dot(act_u - gamma * act_v) \
                                 - bdyn.B.T.dot(bdyn.S.dot(bdyn.f))
 
-                    # take care of directions in which we want our robot to move
-                    forces *= goal_sign
+                    # forces *= goal_sign
 
                     # get laser readings
                     self.pcl_rcvr.laser_listener()
-                    # print('points: {}, pts len: {}'.format(self.pcl_rcvr.points, len(self.pcl_rcvr.points)))
-                    #  reset points
                     self.pcl_rcvr.points = []
-                    gain = 8
+                    gain = 10
 
-                    wrench_base.force.x =  forces[0] * gain
-                    wrench_base.force.y =  forces[1] * gain
-                    wrench_base.torque.z = forces[2] * gain
+                    wrench_base.force.x =  forces[0] * gain #* 10
+                    wrench_base.force.y =  forces[1] * -gain *1.5#*10
+                    wrench_base.torque.z = forces[2] * -1#gain
+                    # base_angle.linear.x = new_sample_info.traj_info.nom_state[t,:][0]
+                    # base_angle.linear.y = new_sample_info.traj_info.nom_state[t,:][1]
+                    # base_angle.angular.z = new_sample_info.traj_info.nom_state[t,:][2]
+                    # self.pub.publish(base_angle)
 
                     rospy.loginfo('Fx: %4f, Fy: %4f, Ftheta: %4f' % (wrench_base.force.x,
                             wrench_base.force.y, wrench_base.torque.z))
+                    # rospy.loginfo('Fx: %4f, Fy: %4f, Ftheta: %4f' % (base_angle.linear.x,
+                    #         base_angle.linear.y, base_angle.angular.z))
 
                     state_change = bdyn.q - self.goal_state
-<<<<<<< HEAD
                     rospy.loginfo("\nv:\t {}, \nv_bar:\t {}, \ndelv:\t {}, \nu:\t {},"
                         "\nq:\t {}, \nq*:\t {}".format(
                         new_sample_info.traj_info.act_adv[t,:],
                         new_sample_info.traj_info.nom_act_adv[t,:], 
                         new_sample_info.traj_info.delta_act_adv[t,:], 
                         new_sample_info.traj_info.action[t,:],
-=======
-                    # rospy.loginfo("\ntorques: {}".format(torques))
-                    rospy.loginfo("\nx:\t {}, \ndelx:\t {}, \nu:\t {}, \ndelu:\t {},\nq:\t {}"
-                        ", \nq*:\t {}".format(
-                        new_sample_info.traj_info.state[t,:],
-                        new_sample_info.traj_info.delta_state[t,:], 
-                        new_sample_info.traj_info.action[t,:],
-                        new_sample_info.traj_info.delta_action[t,:], 
->>>>>>> b97b89ced2eb23fce32d36b9cd287f00dea1e5b2
-                        bdyn.q,
-                        self.goal_state))
+                        bdyn.q, self.goal_state))
                     # send the torques to the base footprint
                     send_body_wrench('base_footprint', reference_frame,
                                                     None, wrench_base, start_time,
@@ -324,8 +315,7 @@ class TrajectoryOptimization(Dynamics):
 
                     gs = np.linalg.norm(self.goal_state)
                     cs = np.linalg.norm(bdyn.q)
-                    if np.allclose(gs, cs, rtol=0, atol=stop_cond):
-                    # if np.all(state_change < stop_cond):
+                    if np.allclose(gs, cs, rtol=0, atol=stop_cond):                        
                         rospy.loginfo("Reached goal state. Terminating.")
                         # eta = stop_cond
                         run = False
@@ -381,7 +371,7 @@ class TrajectoryOptimization(Dynamics):
 
             for t in range (T-1, -1, -1):
 
-                cost_info.Qnut[t]   = cost_info.l[t]
+                cost_info.Qnut[t]   = 1#cost_info.l[t]
                 cost_info.Qx[t,:]     = cost_info.lx[t]
                 cost_info.Qu[t,:]     = cost_info.lu[t]
                 cost_info.Quu[t,:,:]  = cost_info.luu[t]
@@ -450,17 +440,43 @@ class TrajectoryOptimization(Dynamics):
                     break
 
                 # compute open and closed loop gains.
+                # invQuu = sp.linalg.solve_triangular(
+                #             U, sp.linalg.solve_triangular(L, np.eye(dU), lower=True) )
+                # invQvv = sp.linalg.solve_triangular(
+                #             V, sp.linalg.solve_triangular(Lv, np.eye(dV), lower=True) )
+                # Ku    = np.linalg.pinv(
+                #                     (np.eye(dU)#np.ones_like(cost_info.Quu[t]) 
+                #                     - invQuu.dot(cost_info.Quv[t]).dot(\
+                #                       invQvv).dot(cost_info.Quv[t].T)).dot(invQuu[t])
+                #                     )
+                # Kv    = np.linalg.pinv(
+                #                     (np.eye(dV) #np.ones_like(cost_info.Qvv[t]) 
+                #                     - invQvv.dot(cost_info.Quv[t].T).dot(\
+                #                       invQuu).dot(cost_info.Quv[t])).dot(invQvv[t])
+                #                     )               
+                # gu          = Ku.dot(cost_info.Quv[t].dot(invQvv).dot(cost_info.Qv[t]) \
+                #                  - cost_info.Qu[t]
+                #                  )
+                # gv          = Kv.dot(cost_info.Quv[t].T.dot(invQuu).dot(cost_info.Qu[t]) \
+                #                  - cost_info.Qv[t]
+                #                  )   
+                # Gu          = Ku.dot(cost_info.Quv[t].dot(invQvv).dot(cost_info.Qvx[t]) \
+                #                  - cost_info.Qux[t]
+                #                  )
+                # Gv          = Kv.dot(cost_info.Quv[t].T.dot(invQuu).dot(cost_info.Qux[t]) \
+                #                  - cost_info.Qvx[t]
+                #                  )                 
                 invQuu_tilde = sp.linalg.solve_triangular(
                             U, sp.linalg.solve_triangular(L, np.eye(dU), lower=True) )
                 invQvv_tilde = sp.linalg.solve_triangular(
                             V, sp.linalg.solve_triangular(Lv, np.eye(dV), lower=True) )
                 Ku_tilde    = np.linalg.pinv(
-                                    (np.ones_like(cost_info.Quu_tilde[t]) 
+                                    (np.eye(dU)#np.ones_like(cost_info.Quu_tilde[t]) 
                                     - invQuu_tilde.dot(cost_info.Quv_tilde[t]).dot(\
                                       invQvv_tilde).dot(cost_info.Quv_tilde[t].T)).dot(invQuu_tilde[t])
                                     )
                 Kv_tilde    = np.linalg.pinv(
-                                    (np.ones_like(cost_info.Qvv_tilde[t]) 
+                                    (np.eye(dV) #np.ones_like(cost_info.Qvv_tilde[t]) 
                                     - invQvv_tilde.dot(cost_info.Quv_tilde[t].T).dot(\
                                       invQuu_tilde).dot(cost_info.Quv_tilde[t])).dot(invQvv_tilde[t])
                                     )               
@@ -484,6 +500,28 @@ class TrajectoryOptimization(Dynamics):
                 traj_info.Gv[t, :, :] = Gv
 
                 # calculate improved value functions
+                # cost_info.V[t] = 0.5 *(gu.dot(cost_info.Quu[t]).dot(gu)  \
+                #                     +  gv.dot(cost_info.Qvv[t]).dot(gv)) \
+                #                     +  gu.dot(cost_info.Qu[t]) \
+                #                     +  gv.dot(cost_info.Qv[t]) \
+                #                     +  gu.dot(cost_info.Quv[t]).dot(gv) 
+
+                # cost_info.Vx[t,:] = cost_info.Qx[t,:] \
+                #                     + Gu.T.dot(cost_info.Qu[t])\
+                #                     + Gv.T.dot(cost_info.Qv[t])\
+                #                     + Gu.T.dot(cost_info.Quu[t]).dot(gu) \
+                #                     + Gv.T.dot(cost_info.Qvv[t]).dot(gv) \
+                #                     + gu.dot(cost_info.Qux[t]) \
+                #                     + gv.dot(cost_info.Qvx[t]) \
+                #                     + Gv.T.dot(cost_info.Quv[t].T).dot(gu) \
+                #                     + Gu.T.dot(cost_info.Quv[t].T).dot(gv)
+
+                # cost_info.Vxx[t,:,:] = 0.5*(cost_info.Qxx[t] \
+                #                     + Gu.T.dot(cost_info.Quu[t,:,:]).dot(Gu) \
+                #                     + Gv.T.dot(cost_info.Qvv[t,:,:]).dot(Gv)) \
+                #                     + Gu.T.dot(cost_info.Qux[t,:,:]) \
+                #                     + Gv.T.dot(cost_info.Qvx[t,:,:]) \
+                #                     + Gu.T.dot(cost_info.Quv[t,:,:]).dot(Gv)                 
                 cost_info.V[t] = 0.5 *(gu.dot(cost_info.Quu_tilde[t]).dot(gu)  \
                                     +  gv.dot(cost_info.Qvv_tilde[t]).dot(gv)) \
                                     +  gu.dot(cost_info.Qu_tilde[t]) \
@@ -553,7 +591,9 @@ class TrajectoryOptimization(Dynamics):
 
             # update state x(t+1) = f(x(t), u(t))
             traj_info.state[t+1,:]      = traj_info.state[t] \
-                                            + delta_t * self.get_state_rhs_eq(bdyn, traj_info.state[t], traj_info.action[t])
+                                            + delta_t * self.get_state_rhs_eq(\
+                                        bdyn, traj_info.state[t],\
+                                        traj_info.action[t], traj_info.act_adv[t])
 
             # set ubar_i = u_i, x_bar_i = x_i # pg 113 DDp Book
             traj_info.nom_action[t]   = traj_info.action[t]

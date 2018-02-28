@@ -22,7 +22,7 @@ config = {
 	'agent': {
 		'goal_state': np.asarray([1.3, 0.8, -2.752012201858897e-19]).T,
 		# 'goal_state': np.asarray([0.82452343,  0.59753333,  0.07282408]).T,
-		'T':  300,
+		'T':  150,
 		'dU': 4,
 		'dV': 4,
 		'dX': 3, # includes velocity terms
@@ -53,7 +53,7 @@ config = {
 		'stopping_condition': 0.01, #18.0348559119, # this is prob. dependent
 		'stopping_eta': 1e3, # initial eta
 		'c_zero': 1e-6, # zero term for c DP restart procedure
-		'duration_length': 0.3,  # amount of time to apply control law
+		'duration_length': 0.5,  # amount of time to apply control law
 	},
 
 	'all_costs': {
@@ -61,8 +61,8 @@ config = {
 	    'costs': [{'type': CostAction, 'wu': np.array([1, 1])}, {'type': CostState}],
 	    'weights': [1.0, 1.0],
 	    'mode': 'robust',
-	    'gamma': 5,
-	    'alpha': 0.0001,
+	    'gamma': 1,
+	    'alpha': 0.001,
 		'wu': np.array([0.0001, 0.0001, 0.0001, 0.0001]),
 		'wv': np.array([1, 1, 1, 1]),
 		'wx': np.array([1, 1, 1]),

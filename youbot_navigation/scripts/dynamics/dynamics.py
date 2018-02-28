@@ -232,7 +232,7 @@ class Dynamics(MassMaker):
                          pose[-1].orientation.w]
         _, _, robot_angle = euler_from_quaternion(boxtacle_pose[3:])
         self.goal_state  = np.array(boxtacle_pose[:2] + [robot_angle])
-        self.goal_state[0] -= 0.456 # account for box origin so robot doesn't push box when we get to final time step
+        self.goal_state[0] -= 0.9654689700000001 # account for box origin so robot doesn't push box when we get to final time step
 
         # see generalized ILQG Summary page
         k       = range(0, T)
@@ -293,12 +293,11 @@ class Dynamics(MassMaker):
             # calculate the forward dynamics equation
             Minv        = np.linalg.inv(M)
             rhs         = - Minv.dot(C).dot(x_bar[k,:]) - Minv.dot(B.T).dot(S.dot(f)) \
-                              + Minv.dot(B.T).dot(u_bar[k, :] n- gamma * v_bar)/self.wheel['radius']
+                              + Minv.dot(B.T).dot(u_bar[k, :] - gamma * v_bar[k,:])/self.wheel['radius']
 
             if k == 0:
                 x_bar[k]= delta_t * rhs
-
-            if k < K - 1:
+            elif k < K - 1:
                 x_bar[k+1,:]= x_bar[k,:] +  delta_t * rhs
 
             # step 2.1: get linearized dynamics
@@ -310,7 +309,8 @@ class Dynamics(MassMaker):
             u[k,:]      = lhs.dot(M.dot(qaccel) + C.dot(qvel) + \
                                     B.T.dot(S).dot(f)).squeeze() + gamma * v[k,:]
             # this is already initialized to a zero mean var 2 rand walk vector
-            # v[k,:]      = u[k,:] #+ v_bar[k]#generate_noise(1, dV, self.agent)
+            # v[k,:]      = (u[k,:] - lhs.dot(M.dot(qaccel) + C.dot(qvel) + \
+            #                                     B.T.dot(S).dot(f)).squeeze())/gamma #+ v_bar[k]#generate_noise(1, dV, self.agent)
 
             # inject noise to the states
             x[k,:]      = q + x_noise[k, :] if noisy else q
@@ -352,7 +352,7 @@ class Dynamics(MassMaker):
                         ]
             right_mat  = left_mat.T
 
-            l[k]   = 0.5 * left_mat.dot(inner_mat).dot(right_mat)#.squeeze()
+            l[k]   = 0.5 * left_mat.dot(inner_mat).dot(right_mat).squeeze()
 
             # store away stage terms
             traj_info.fx[k,:]            = fx[k,:]

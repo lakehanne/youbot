@@ -38,8 +38,8 @@ class CostAction(Cost):
         lvx           = np.zeros((dV, dX))
         lxx           = np.zeros((dX, dX))
 
-        l             = (alpha**2) * (np.cosh(wu_exp.T.dot(u_exp)) \
-                        - gamma*np.cosh(wv_exp.T.dot(v_exp)))
+        l             = (alpha**2) * (np.cosh(wu_exp.T.dot(u_exp)-1) \
+                        - gamma*np.cosh(wv_exp.T.dot(v_exp)-1))
         l             = l.squeeze() if l.ndim > 1 else l
         
         lu            = (alpha**2) * wu * np.sinh(wu*u)
