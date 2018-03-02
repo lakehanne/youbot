@@ -61,7 +61,7 @@ config = {
 	    'costs': [{'type': CostAction, 'wu': np.array([1, 1])}, {'type': CostState}],
 	    'weights': [1.0, 1.0],
 	    'mode': 'robust',
-	    'gamma': 1,
+	    'gamma': 50,
 	    'alpha': 0.001,
 		'wu': np.array([0.0001, 0.0001, 0.0001, 0.0001]),
 		'wv': np.array([1, 1, 1, 1]),

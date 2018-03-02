@@ -232,7 +232,7 @@ class Dynamics(MassMaker):
                          pose[-1].orientation.w]
         _, _, robot_angle = euler_from_quaternion(boxtacle_pose[3:])
         self.goal_state  = np.array(boxtacle_pose[:2] + [robot_angle])
-        self.goal_state[0] -= 0.9654689700000001 # account for box origin so robot doesn't push box when we get to final time step
+        self.goal_state[0] -= 1.004689700000001 # account for box origin so robot doesn't push box when we get to final time step
 
         # see generalized ILQG Summary page
         k       = range(0, T)
@@ -355,12 +355,12 @@ class Dynamics(MassMaker):
             l[k]   = 0.5 * left_mat.dot(inner_mat).dot(right_mat).squeeze()
 
             # store away stage terms
-            traj_info.fx[k,:]            = fx[k,:]
-            traj_info.fu[k,:]            = fu[k,:]
-            traj_info.fv[k,:]            = fv[k,:]
             traj_info.action[k,:]        = u[k,:]
             traj_info.act_adv[k,:]       = v[k,:]
             traj_info.state[k,:]         = x[k,:]
+            traj_info.fx[k,:]            = fx[k,:]
+            traj_info.fu[k,:]            = fu[k,:]
+            traj_info.fv[k,:]            = fv[k,:]
             traj_info.nom_state[k,:]     = x_bar[k,:]
             traj_info.nom_action[k,:]    = u_bar[k,:]
             traj_info.nom_act_adv[k,:]   = v_bar[k,:]

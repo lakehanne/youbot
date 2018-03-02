@@ -284,8 +284,8 @@ class TrajectoryOptimization(Dynamics):
                     gain = 10
 
                     wrench_base.force.x =  forces[0] * gain #* 10
-                    wrench_base.force.y =  forces[1] * -gain *1.5#*10
-                    wrench_base.torque.z = forces[2] * -1#gain
+                    wrench_base.force.y =  forces[1] * gain *1.5#*10
+                    wrench_base.torque.z = forces[2] * 1#gain
                     # base_angle.linear.x = new_sample_info.traj_info.nom_state[t,:][0]
                     # base_angle.linear.y = new_sample_info.traj_info.nom_state[t,:][1]
                     # base_angle.angular.z = new_sample_info.traj_info.nom_state[t,:][2]
@@ -352,7 +352,8 @@ class TrajectoryOptimization(Dynamics):
         rospy.loginfo("Reaching the goal state took {} secs".format(toc-tic))
 
         with open(save_dir + '/time.txt', 'a') as f:
-            f.write("time taken: %s" % str(toc-tic))
+            f.write("\ngamma: {} | dist: {} | time taken: {}"
+                .format( gamma, abs(gs-cs), toc-tic))
 
     def backward(self, sample_info, noisy=False):
         T  = self.T
