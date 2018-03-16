@@ -1,0 +1,298 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>iros18</title><meta name="generator" content="MATLAB 9.3"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2018-02-22"><meta name="DC.source" content="iros18.m"><style type="text/css">
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
+
+html { min-height:100%; margin-bottom:1px; }
+html body { height:100%; margin:0px; font-family:Arial, Helvetica, sans-serif; font-size:10px; color:#000; line-height:140%; background:#fff none; overflow-y:scroll; }
+html body td { vertical-align:top; text-align:left; }
+
+h1 { padding:0px; margin:0px 0px 25px; font-family:Arial, Helvetica, sans-serif; font-size:1.5em; color:#d55000; line-height:100%; font-weight:normal; }
+h2 { padding:0px; margin:0px 0px 8px; font-family:Arial, Helvetica, sans-serif; font-size:1.2em; color:#000; font-weight:bold; line-height:140%; border-bottom:1px solid #d6d4d4; display:block; }
+h3 { padding:0px; margin:0px 0px 5px; font-family:Arial, Helvetica, sans-serif; font-size:1.1em; color:#000; font-weight:bold; line-height:140%; }
+
+a { color:#005fce; text-decoration:none; }
+a:hover { color:#005fce; text-decoration:underline; }
+a:visited { color:#004aa0; text-decoration:none; }
+
+p { padding:0px; margin:0px 0px 20px; }
+img { padding:0px; margin:0px 0px 20px; border:none; }
+p img, pre img, tt img, li img, h1 img, h2 img { margin-bottom:0px; } 
+
+ul { padding:0px; margin:0px 0px 20px 23px; list-style:square; }
+ul li { padding:0px; margin:0px 0px 7px 0px; }
+ul li ul { padding:5px 0px 0px; margin:0px 0px 7px 23px; }
+ul li ol li { list-style:decimal; }
+ol { padding:0px; margin:0px 0px 20px 0px; list-style:decimal; }
+ol li { padding:0px; margin:0px 0px 7px 23px; list-style-type:decimal; }
+ol li ol { padding:5px 0px 0px; margin:0px 0px 7px 0px; }
+ol li ol li { list-style-type:lower-alpha; }
+ol li ul { padding-top:7px; }
+ol li ul li { list-style:square; }
+
+.content { font-size:1.2em; line-height:140%; padding: 20px; }
+
+pre, code { font-size:12px; }
+tt { font-size: 1.2em; }
+pre { margin:0px 0px 20px; }
+pre.codeinput { padding:10px; border:1px solid #d3d3d3; background:#f7f7f7; }
+pre.codeoutput { padding:10px 11px; margin:0px 0px 20px; color:#4c4c4c; }
+pre.error { color:red; }
+
+@media print { pre.codeinput, pre.codeoutput { word-wrap:break-word; width:100%; } }
+
+span.keyword { color:#0000FF }
+span.comment { color:#228B22 }
+span.string { color:#A020F0 }
+span.untermstring { color:#B20000 }
+span.syscmd { color:#B28C00 }
+
+.footer { width:auto; padding:10px 0px; margin:25px 0px 0px; border-top:1px dotted #878787; font-size:0.8em; line-height:140%; font-style:italic; color:#878787; text-align:left; float:none; }
+.footer p { margin:0px; }
+.footer a { color:#878787; }
+.footer a:hover { color:#878787; text-decoration:underline; }
+.footer a:visited { color:#878787; }
+
+table th { padding:7px 5px; text-align:left; vertical-align:middle; border: 1px solid #d6d4d4; font-weight:bold; }
+table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px solid #d6d4d4; }
+
+
+
+
+
+  </style></head><body><div class="content"><h2>Contents</h2><div><ul><li><a href="#1">Plot Trajectory evolution</a></li><li><a href="#2">Verifying equations</a></li><li><a href="#3">Define the Lagrangian</a></li></ul></div><h2 id="1">Plot Trajectory evolution</h2><pre class="codeinput">close <span class="string">all</span>
+cd(<span class="string">'/home/lex/catkin_ws/src/youbot/youbot_navigation/data'</span>)
+q = load(<span class="string">'trajectory.txt'</span>);
+qstar = repmat([0.82452343,  0.59753333,  0.07282408], [length(q), 1]);
+time_scale = 0.3;
+
+X = time_scale* linspace(1, length(q), length(q));
+p = plot(X, [q(:,1), q(:,2), q(:,3)]); hold <span class="string">on</span>
+<span class="comment">%p2 = plot(X, [qstar(:,1), qstar(:,2), qstar(:,2)]);</span>
+
+title(<span class="string">"ILQG Trajectory Evolution"</span>)
+
+p(1).LineWidth = 8;
+p(1).MarkerSize = 10;
+
+p(2).LineWidth = 8;
+p(2).MarkerSize = 10;
+
+p(3).LineWidth = 8;
+p(3).MarkerSize = 10;
+
+<span class="comment">% p2(1).LineWidth = 5;</span>
+<span class="comment">% p2(1).LineStyle = '--';</span>
+<span class="comment">% p2(1).MarkerSize = 10;</span>
+<span class="comment">%</span>
+<span class="comment">% p2(2).LineWidth = 5;</span>
+<span class="comment">% p2(2).LineStyle = '--';</span>
+<span class="comment">% p2(2).MarkerSize = 10;</span>
+<span class="comment">%</span>
+<span class="comment">% p2(3).LineWidth = 5;</span>
+<span class="comment">% p2(3).LineStyle = '--';</span>
+<span class="comment">% p2(3).MarkerSize = 10;</span>
+
+lgd = legend({<span class="string">'x_I'</span>, <span class="string">'y_I'</span>, <span class="string">'\theta_I'</span>, <span class="string">'x_I^*'</span>, <span class="string">'y_I^*'</span>, <span class="string">'\theta_I^*'</span>}, <span class="string">'location'</span>, <span class="string">'southeast'</span>, <span class="keyword">...</span>
+<span class="string">'FontSize'</span>,20, <span class="string">'FontWeight'</span>, <span class="string">'bold'</span>)
+<span class="comment">%lgd2 = legend({'x_I^*', 'y_I^*', '\theta_I^*'}, 'location', 'southeast', ...</span>
+<span class="comment">%'FontSize',20, 'FontWeight', 'bold')</span>
+
+xlabel(<span class="string">"Time(seconds)"</span>, <span class="string">'FontSize'</span>,20, <span class="string">'FontWeight'</span>, <span class="string">'bold'</span>)
+ylabel(<span class="string">"State"</span>, <span class="string">'FontSize'</span>,20, <span class="string">'FontWeight'</span>, <span class="string">'bold'</span>)
+
+<span class="comment">%savefig(p, '/home/lex/catkin_ws/src/youbot/youbot_navigation/data/trajectory.fig')</span>
+
+grid <span class="string">on</span>
+</pre><pre class="codeoutput">Warning: Ignoring extra legend entries. 
+
+lgd = 
+
+  Legend (x_I, y_I, \theta_I) with properties:
+
+         String: {'x_I'  'y_I'  '\theta_I'}
+       Location: 'southeast'
+    Orientation: 'vertical'
+       FontSize: 20
+       Position: [0.7440 0.1413 0.1375 0.3262]
+          Units: 'normalized'
+
+  Use GET to show all properties
+
+</pre><img vspace="5" hspace="5" src="iros18_01.png" alt=""> <h2 id="2">Verifying equations</h2><pre class="codeinput">clc; close <span class="string">all</span>; clear <span class="string">all</span>
+syms <span class="string">r</span> <span class="string">l</span> <span class="string">a</span> <span class="string">t</span> <span class="string">pd1</span> <span class="string">pd2</span> <span class="string">pd3</span> <span class="string">pd4</span> <span class="string">xd</span> <span class="string">yd</span> <span class="string">td</span> <span class="string">real</span>
+
+Zetad = [xd yd td]';
+rotmat = [-sin(t) cos(t) 0; <span class="keyword">...</span>
+           cos(t), sin(t) 0; <span class="keyword">...</span>
+           0 , 0, 1];
+Phid = [pd1, pd2, pd3, pd4]';
+
+J = [sqrt(2)/2, sqrt(2)/2, l*sin(pi/4-a); <span class="keyword">...</span>
+    -sqrt(2)/2, sqrt(2)/2, l*sin(pi/4-a); <span class="keyword">...</span>
+    -sqrt(2)/2, -sqrt(2)/2, l*sin(pi/4-a); <span class="keyword">...</span>
+    sqrt(2)/2, -sqrt(2)/2, l*sin(pi/4-a)];
+
+Phid_mat = sqrt(2) * J * rotmat;
+Phid_eq = -(1/r) * Phid_mat * Zetad
+
+
+Phid = -sqrt(2)/r * J * Zetad
+</pre><pre class="codeoutput"> 
+Phid_eq =
+ 
+ (2^(1/2)*l*td*sin(a - pi/4))/r - (yd*(cos(t) + sin(t)))/r - (xd*(cos(t) - sin(t)))/r
+ (yd*(cos(t) - sin(t)))/r - (xd*(cos(t) + sin(t)))/r + (2^(1/2)*l*td*sin(a - pi/4))/r
+ (xd*(cos(t) - sin(t)))/r + (yd*(cos(t) + sin(t)))/r + (2^(1/2)*l*td*sin(a - pi/4))/r
+ (xd*(cos(t) + sin(t)))/r - (yd*(cos(t) - sin(t)))/r + (2^(1/2)*l*td*sin(a - pi/4))/r
+ 
+ 
+Phid =
+ 
+ (2^(1/2)*l*td*sin(a - pi/4))/r - yd/r - xd/r
+ xd/r - yd/r + (2^(1/2)*l*td*sin(a - pi/4))/r
+ xd/r + yd/r + (2^(1/2)*l*td*sin(a - pi/4))/r
+ yd/r - xd/r + (2^(1/2)*l*td*sin(a - pi/4))/r
+ 
+</pre><h2 id="3">Define the Lagrangian</h2><pre class="codeinput">syms <span class="string">Ib</span> <span class="string">t</span> <span class="string">td</span> <span class="string">mb</span> <span class="string">xid</span> <span class="string">yid</span> <span class="string">d2</span> <span class="string">d1</span> <span class="string">mw</span> <span class="string">a</span> <span class="keyword">...</span>
+    <span class="string">mw</span> <span class="string">l</span> <span class="string">I1</span> <span class="string">I2</span> <span class="string">I3</span> <span class="string">I4</span> <span class="string">r</span>
+L = 0.5 * Ib * td^2 <span class="keyword">...</span>
+    + 0.5 * mb * ( (-xid*sin(t) + yid*cos(t) + td*d2)^2  <span class="keyword">...</span>
+                  + (xid*cos(t) + yid*sin(t) - td*d1)^2  ) <span class="keyword">...</span>
+     + 0.5 * mw * ( ( xid * (sin(t)- cos(t)) - yid * (cos(t) + sin(t)) - sqrt(2)*l*td * sin(pi/4-a))^2 <span class="keyword">...</span>
+                  + (-xid * (sin(t)+ cos(t)) + yid * (cos(t) - sin(t)) - sqrt(2)*l*td * sin(pi/4-a))^2 <span class="keyword">...</span>
+                  + ( xid * (-sin(t)+ cos(t)) + yid * (cos(t) + sin(t)) - sqrt(2)*l*td * sin(pi/4-a))^2 <span class="keyword">...</span>
+                  + (xid * (sin(t)+ cos(t)) + yid * (-cos(t) + sin(t)) - sqrt(2)*l*td * sin(pi/4-a))^2 ) <span class="keyword">...</span>
+     + 1/(2*r^2) * I1 * + (xid * (sin(t)- cos(t)) - yid * (cos(t) + sin(t)) - sqrt(2)*l*td * sin(pi/4-a))^2 <span class="keyword">...</span>
+     + 1/(2*r^2) * I2 * + (-xid * (sin(t)+ cos(t)) + yid * (cos(t) - sin(t)) - sqrt(2)*l*td * sin(pi/4-a))^2 <span class="keyword">...</span>
+     + 1/(2*r^2) * I3 * + (xid * (-sin(t)+ cos(t)) + yid * (cos(t) + sin(t)) - sqrt(2)*l*td * sin(pi/4-a))^2 <span class="keyword">...</span>
+     + 1/(2*r^2) * I4 * + (xid * (sin(t)+ cos(t)) + yid * (-cos(t) + sin(t)) - sqrt(2)*l*td * sin(pi/4-a))^2;
+<span class="comment">% define the torques</span>
+syms <span class="string">t1</span> <span class="string">t2</span> <span class="string">t3</span> <span class="string">t4</span> <span class="string">f</span> <span class="string">phi1d</span> <span class="string">phi2d</span> <span class="string">phi3d</span> <span class="string">phi4d</span>
+left_mult = [(t1 - r* sign(phi1d)*f), (t2 - r* sign(phi2d)*f), (t3 - r* sign(phi3d)*f), (t4 - r* sign(phi4d)*f)];
+
+F1 = left_mult * Phid_mat(1:end,1);
+F2 = left_mult * Phid_mat(1:end,2);
+F3 = left_mult * Phid_mat(1:end,3);
+
+ eq_xid = F1 - diff(L, xid) * xid - diff(L, xid);
+ eq_yid = F2 - diff(L, yid) * yid - diff(L, yid);
+ eq_td  = F3 - diff(L, td)  * td  - diff(L, td);
+
+ dynamics_eq = [eq_xid; eq_yid; eq_td];
+
+ simplify(dynamics_eq)
+</pre><pre class="codeoutput"> 
+ans =
+ 
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         -(I1*xid + I2*xid + I3*xid + I4*xid + I1*xid^2 + I2*xid^2 + I3*xid^2 + I4*xid^2 + mb*r^2*xid + 4*mw*r^2*xid + I1*yid*cos(2*t) - I2*yid*cos(2*t) + I3*yid*cos(2*t) - I4*yid*cos(2*t) - I1*xid*sin(2*t) + I2*xid*sin(2*t) - I3*xid*sin(2*t) + I4*xid*sin(2*t) + mb*r^2*xid^2 + 4*mw*r^2*xid^2 - r^2*t1*cos(t) - r^2*t2*cos(t) + r^2*t3*cos(t) + r^2*t4*cos(t) + r^2*t1*sin(t) - r^2*t2*sin(t) - r^2*t3*sin(t) + r^2*t4*sin(t) - I1*xid^2*sin(2*t) + I2*xid^2*sin(2*t) - I3*xid^2*sin(2*t) + I4*xid^2*sin(2*t) + I2*l*td*cos(a + t) - I4*l*td*cos(a + t) - I1*l*td*sin(a + t) + I3*l*td*sin(a + t) + f*r^3*cos(t)*sign(phi1d) + f*r^3*cos(t)*sign(phi2d) - f*r^3*cos(t)*sign(phi3d) - f*r^3*cos(t)*sign(phi4d) - f*r^3*sign(phi1d)*sin(t) + f*r^3*sign(phi2d)*sin(t) + f*r^3*sign(phi3d)*sin(t) - f*r^3*sign(phi4d)*sin(t) + I1*l*td*cos(a - t) - I3*l*td*cos(a - t) - I2*l*td*sin(a - t) + I4*l*td*sin(a - t) + I1*xid*yid*cos(2*t) - I2*xid*yid*cos(2*t) + I3*xid*yid*cos(2*t) - I4*xid*yid*cos(2*t) - I2*l*td*xid*sin(a - t) + I4*l*td*xid*sin(a - t) - d1*mb*r^2*td*cos(t) - d2*mb*r^2*td*sin(t) + I2*l*td*xid*cos(a + t) - I4*l*td*xid*cos(a + t) - I1*l*td*xid*sin(a + t) + I3*l*td*xid*sin(a + t) + I1*l*td*xid*cos(a - t) - I3*l*td*xid*cos(a - t) - d1*mb*r^2*td*xid*cos(t) - d2*mb*r^2*td*xid*sin(t))/r^2
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         -(I1*yid + I2*yid + I3*yid + I4*yid + I1*yid^2 + I2*yid^2 + I3*yid^2 + I4*yid^2 + mb*r^2*yid + 4*mw*r^2*yid + I1*xid*cos(2*t) - I2*xid*cos(2*t) + I3*xid*cos(2*t) - I4*xid*cos(2*t) + I1*yid*sin(2*t) - I2*yid*sin(2*t) + I3*yid*sin(2*t) - I4*yid*sin(2*t) + mb*r^2*yid^2 + 4*mw*r^2*yid^2 - r^2*t1*cos(t) + r^2*t2*cos(t) + r^2*t3*cos(t) - r^2*t4*cos(t) - r^2*t1*sin(t) - r^2*t2*sin(t) + r^2*t3*sin(t) + r^2*t4*sin(t) + I1*yid^2*sin(2*t) - I2*yid^2*sin(2*t) + I3*yid^2*sin(2*t) - I4*yid^2*sin(2*t) + I1*l*td*cos(a + t) - I3*l*td*cos(a + t) + I2*l*td*sin(a + t) - I4*l*td*sin(a + t) + f*r^3*cos(t)*sign(phi1d) - f*r^3*cos(t)*sign(phi2d) - f*r^3*cos(t)*sign(phi3d) + f*r^3*cos(t)*sign(phi4d) + f*r^3*sign(phi1d)*sin(t) + f*r^3*sign(phi2d)*sin(t) - f*r^3*sign(phi3d)*sin(t) - f*r^3*sign(phi4d)*sin(t) - I2*l*td*cos(a - t) + I4*l*td*cos(a - t) - I1*l*td*sin(a - t) + I3*l*td*sin(a - t) + I1*xid*yid*cos(2*t) - I2*xid*yid*cos(2*t) + I3*xid*yid*cos(2*t) - I4*xid*yid*cos(2*t) - I1*l*td*yid*sin(a - t) + I3*l*td*yid*sin(a - t) + d2*mb*r^2*td*cos(t) - d1*mb*r^2*td*sin(t) + I1*l*td*yid*cos(a + t) - I3*l*td*yid*cos(a + t) + I2*l*td*yid*sin(a + t) - I4*l*td*yid*sin(a + t) - I2*l*td*yid*cos(a - t) + I4*l*td*yid*cos(a - t) + d2*mb*r^2*td*yid*cos(t) - d1*mb*r^2*td*yid*sin(t))/r^2
+ -(I1*l^2*td^2 + I2*l^2*td^2 + I3*l^2*td^2 + I4*l^2*td^2 + Ib*r^2*td^2 + I1*l^2*td + I2*l^2*td + I3*l^2*td + I4*l^2*td + Ib*r^2*td - I1*l^2*td*sin(2*a) - I2*l^2*td*sin(2*a) - I3*l^2*td*sin(2*a) - I4*l^2*td*sin(2*a) + I2*l*xid*cos(a + t) - I4*l*xid*cos(a + t) + I1*l*yid*cos(a + t) - I3*l*yid*cos(a + t) - I1*l*xid*sin(a + t) + I3*l*xid*sin(a + t) + d1^2*mb*r^2*td^2 + d2^2*mb*r^2*td^2 + I2*l*yid*sin(a + t) - I4*l*yid*sin(a + t) + 4*l^2*mw*r^2*td^2 - I1*l^2*td^2*sin(2*a) - I2*l^2*td^2*sin(2*a) - I3*l^2*td^2*sin(2*a) - I4*l^2*td^2*sin(2*a) + I1*l*xid*cos(a - t) - I3*l*xid*cos(a - t) - I2*l*yid*cos(a - t) + I4*l*yid*cos(a - t) - I2*l*xid*sin(a - t) + I4*l*xid*sin(a - t) - I1*l*yid*sin(a - t) + I3*l*yid*sin(a - t) - l*r^2*t1*cos(a) - l*r^2*t2*cos(a) - l*r^2*t3*cos(a) - l*r^2*t4*cos(a) + d1^2*mb*r^2*td + d2^2*mb*r^2*td + 4*l^2*mw*r^2*td + l*r^2*t1*sin(a) + l*r^2*t2*sin(a) + l*r^2*t3*sin(a) + l*r^2*t4*sin(a) - I2*l*td*xid*sin(a - t) + I4*l*td*xid*sin(a - t) - I1*l*td*yid*sin(a - t) + I3*l*td*yid*sin(a - t) - 4*l^2*mw*r^2*td*sin(2*a) - d1*mb*r^2*xid*cos(t) + d2*mb*r^2*yid*cos(t) - d2*mb*r^2*xid*sin(t) - d1*mb*r^2*yid*sin(t) - 4*l^2*mw*r^2*td^2*sin(2*a) + I2*l*td*xid*cos(a + t) - I4*l*td*xid*cos(a + t) + I1*l*td*yid*cos(a + t) - I3*l*td*yid*cos(a + t) - I1*l*td*xid*sin(a + t) + I3*l*td*xid*sin(a + t) + I2*l*td*yid*sin(a + t) - I4*l*td*yid*sin(a + t) + f*l*r^3*cos(a)*sign(phi1d) + f*l*r^3*cos(a)*sign(phi2d) + f*l*r^3*cos(a)*sign(phi3d) + f*l*r^3*cos(a)*sign(phi4d) - f*l*r^3*sin(a)*sign(phi1d) - f*l*r^3*sin(a)*sign(phi2d) - f*l*r^3*sin(a)*sign(phi3d) - f*l*r^3*sin(a)*sign(phi4d) + I1*l*td*xid*cos(a - t) - I3*l*td*xid*cos(a - t) - I2*l*td*yid*cos(a - t) + I4*l*td*yid*cos(a - t) - d1*mb*r^2*td*xid*cos(t) + d2*mb*r^2*td*yid*cos(t) - d2*mb*r^2*td*xid*sin(t) - d1*mb*r^2*td*yid*sin(t))/r^2
+ 
+</pre><p class="footer"><br><a href="http://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2017b</a><br></p></div><!--
+##### SOURCE BEGIN #####
+%% Plot Trajectory evolution
+close all
+cd('/home/lex/catkin_ws/src/youbot/youbot_navigation/data')
+q = load('trajectory.txt');
+qstar = repmat([0.82452343,  0.59753333,  0.07282408], [length(q), 1]);
+time_scale = 0.3;
+
+X = time_scale* linspace(1, length(q), length(q));
+p = plot(X, [q(:,1), q(:,2), q(:,3)]); hold on
+%p2 = plot(X, [qstar(:,1), qstar(:,2), qstar(:,2)]);
+
+title("ILQG Trajectory Evolution")
+
+p(1).LineWidth = 8;
+p(1).MarkerSize = 10;
+
+p(2).LineWidth = 8;
+p(2).MarkerSize = 10;
+
+p(3).LineWidth = 8;
+p(3).MarkerSize = 10;
+
+% p2(1).LineWidth = 5;
+% p2(1).LineStyle = 'REPLACE_WITH_DASH_DASH';
+% p2(1).MarkerSize = 10;
+% 
+% p2(2).LineWidth = 5;
+% p2(2).LineStyle = 'REPLACE_WITH_DASH_DASH';
+% p2(2).MarkerSize = 10;
+% 
+% p2(3).LineWidth = 5;
+% p2(3).LineStyle = 'REPLACE_WITH_DASH_DASH';
+% p2(3).MarkerSize = 10;
+
+lgd = legend({'x_I', 'y_I', '\theta_I', 'x_I^*', 'y_I^*', '\theta_I^*'}, 'location', 'southeast', ...
+'FontSize',20, 'FontWeight', 'bold')
+%lgd2 = legend({'x_I^*', 'y_I^*', '\theta_I^*'}, 'location', 'southeast', ...
+%'FontSize',20, 'FontWeight', 'bold')
+
+xlabel("Time(seconds)", 'FontSize',20, 'FontWeight', 'bold')
+ylabel("State", 'FontSize',20, 'FontWeight', 'bold')
+
+%savefig(p, '/home/lex/catkin_ws/src/youbot/youbot_navigation/data/trajectory.fig')
+
+grid on
+
+%% Verifying equations
+clc; close all; clear all
+syms r l a t pd1 pd2 pd3 pd4 xd yd td real
+
+Zetad = [xd yd td]';
+rotmat = [-sin(t) cos(t) 0; ...
+           cos(t), sin(t) 0; ...
+           0 , 0, 1];
+Phid = [pd1, pd2, pd3, pd4]';  
+
+J = [sqrt(2)/2, sqrt(2)/2, l*sin(pi/4-a); ...
+    -sqrt(2)/2, sqrt(2)/2, l*sin(pi/4-a); ...
+    -sqrt(2)/2, -sqrt(2)/2, l*sin(pi/4-a); ...
+    sqrt(2)/2, -sqrt(2)/2, l*sin(pi/4-a)];
+
+Phid_mat = sqrt(2) * J * rotmat;
+Phid_eq = -(1/r) * Phid_mat * Zetad
+
+ 
+Phid = -sqrt(2)/r * J * Zetad
+
+%% Define the Lagrangian
+syms Ib t td mb xid yid d2 d1 mw a ...
+    mw l I1 I2 I3 I4 r 
+L = 0.5 * Ib * td^2 ...
+    + 0.5 * mb * ( (-xid*sin(t) + yid*cos(t) + td*d2)^2  ...
+                  + (xid*cos(t) + yid*sin(t) - td*d1)^2  ) ...
+     + 0.5 * mw * ( ( xid * (sin(t)- cos(t)) - yid * (cos(t) + sin(t)) - sqrt(2)*l*td * sin(pi/4-a))^2 ...
+                  + (-xid * (sin(t)+ cos(t)) + yid * (cos(t) - sin(t)) - sqrt(2)*l*td * sin(pi/4-a))^2 ...
+                  + ( xid * (-sin(t)+ cos(t)) + yid * (cos(t) + sin(t)) - sqrt(2)*l*td * sin(pi/4-a))^2 ...
+                  + (xid * (sin(t)+ cos(t)) + yid * (-cos(t) + sin(t)) - sqrt(2)*l*td * sin(pi/4-a))^2 ) ...
+     + 1/(2*r^2) * I1 * + (xid * (sin(t)- cos(t)) - yid * (cos(t) + sin(t)) - sqrt(2)*l*td * sin(pi/4-a))^2 ...
+     + 1/(2*r^2) * I2 * + (-xid * (sin(t)+ cos(t)) + yid * (cos(t) - sin(t)) - sqrt(2)*l*td * sin(pi/4-a))^2 ...
+     + 1/(2*r^2) * I3 * + (xid * (-sin(t)+ cos(t)) + yid * (cos(t) + sin(t)) - sqrt(2)*l*td * sin(pi/4-a))^2 ...
+     + 1/(2*r^2) * I4 * + (xid * (sin(t)+ cos(t)) + yid * (-cos(t) + sin(t)) - sqrt(2)*l*td * sin(pi/4-a))^2;
+% define the torques
+syms t1 t2 t3 t4 f phi1d phi2d phi3d phi4d 
+left_mult = [(t1 - r* sign(phi1d)*f), (t2 - r* sign(phi2d)*f), (t3 - r* sign(phi3d)*f), (t4 - r* sign(phi4d)*f)];
+
+F1 = left_mult * Phid_mat(1:end,1);
+F2 = left_mult * Phid_mat(1:end,2);
+F3 = left_mult * Phid_mat(1:end,3);
+
+ eq_xid = F1 - diff(L, xid) * xid - diff(L, xid);
+ eq_yid = F2 - diff(L, yid) * yid - diff(L, yid);
+ eq_td  = F3 - diff(L, td)  * td  - diff(L, td);
+ 
+ dynamics_eq = [eq_xid; eq_yid; eq_td];
+ 
+ simplify(dynamics_eq)
+
+##### SOURCE END #####
+--></body></html>

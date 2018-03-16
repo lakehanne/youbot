@@ -1,3 +1,17 @@
+
+
+### Overview
+
+Most of the codes here, particularly for [youbot_navigation](/youbot_navigation) are an implementation of my IROS 2018 minimax iterative dynamic game submission.
+
+The following website describes the results of the paper and the videos of experiments. 
+
+[Minimax Iterative Dynamic Game: Application to Nonlinear Robot Control Tasks](http://ecs.utdallas.edu/~opo140030/iros18/iros2018.html#/)
+
+I am currently working on implementing the algorithm with policy search methods on the kuka youbot platform.
+
+
+
 ### Running
 
 * Gazebo model
@@ -11,6 +25,10 @@
 
 
 #### For Adaptive Monte Carlo Only
+
+Old code that uses the adaptive monte carlo localization algorithm in navigating the robot in the cartesian space of the inertial frame. This is based on Sebastian Thrun et. al's Probabilistic Robotics book.
+
+
 * AMCL 
 	* `./run-navstack`
 
