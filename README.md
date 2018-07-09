@@ -13,7 +13,9 @@ I am currently working on implementing the algorithm with policy search methods 
 ### Docker Image
 Everything is contained in the docker image at the following tag, `iros18_submission`:
 
-[IROS 18 Docker Image](https://hubs.docker.com/r/lakehanne)
+
+                    [IROS 18 Docker Image](https://hub.docker.com/r/lakehanne/youbotbuntu14/tags/)
+		    
 
 Please pull the image like so:
 
