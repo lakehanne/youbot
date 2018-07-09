@@ -13,7 +13,7 @@ I am currently working on implementing the algorithm with policy search methods 
 ### Docker Image
 Everything is contained in the docker image at the following tag, `iros18_submission`:
 
-[Docker Image](hubs.docker.com/r/lakehanne)
+[IROS 18 Docker Image](https://hubs.docker.com/r/lakehanne)
 
 Please pull the image like so:
 
