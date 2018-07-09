@@ -11,10 +11,7 @@ The following website describes the results of the paper and the videos of exper
 I am currently working on implementing the algorithm with policy search methods on the kuka youbot platform.
 
 ### Docker Image
-Everything is contained in the docker image at the following tag, `iros18_submission`:
-
-
-                    [IROS 18 Docker Image](https://hub.docker.com/r/lakehanne/youbotbuntu14/tags/)
+Everything is contained in the docker image at the following tag, `iros18_submission`, [IROS 18 Docker Image](https://hub.docker.com/r/lakehanne/youbotbuntu14/tags/)
 		    
 
 Please pull the image like so:
