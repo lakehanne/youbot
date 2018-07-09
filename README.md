@@ -10,9 +10,18 @@ The following website describes the results of the paper and the videos of exper
 
 I am currently working on implementing the algorithm with policy search methods on the kuka youbot platform.
 
+### Docker Image
+Everything is contained in the docker image at the following tag, `iros18_submission`:
 
+[Docker Image](hubs.docker.com/r/lakehanne)
 
-### Running
+Please pull the image like so:
+
+```
+	docker pull lakehanne/youbotbuntu14:iros18_submission
+```
+
+### Running on a native Linux distro
 
 * Gazebo model
   * `./run-gazebo-model`
